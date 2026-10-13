@@ -27,3 +27,9 @@ Append a section after each tranche (T0..T14) with: what was built, what tests p
 - RudderHook implements IHooks (v4-core): beforeAddLiquidity gates to vaultFactory and enforces paused; afterSwap records TWAP observations (ring buffer, truncates to ~720 recent). Helpers isOracleReady/getLastObservation. Minimal permissions. 
 - Oracle safety note: withdrawals must never revert on bad oracle (to be enforced in vault; deposits/rebalances may revert).
 - Gates: fmt/build/test pass (12 tests).
+
+## T3 (Registry and factory)
+- StrategyRegistry: register strategy with Envelope, tighten (instant), queueLoosen/applyLoosen (24h timelock), curator checks, events. Envelope changes: tightening instant, loosening timelocked.
+- VaultFactory: minimal-proxy clones, tracks vault->strategyId, isVault helper. Vaults call PoolManager.unlock (no PM NFT).
+- RudderVault skeleton: ERC20, per-account holdBasket (amount0,amount1) only, initialized once.
+- Gates: fmt ok; build has lint warnings only (not errors). Tests still 12 passing.
