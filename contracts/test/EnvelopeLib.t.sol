@@ -2,7 +2,7 @@
 pragma solidity 0.8.26;
 
 import {Test} from "forge-std/Test.sol";
-import {Envelope, EnvelopeLib} from "../src/libraries/EnvelopeLib.sol";
+import {EnvelopeLib} from "../src/libraries/EnvelopeLib.sol";
 
 contract EnvelopeLibWrapper {
     function validateRangeWidth(int24 width, int24 maxWidth) external pure {

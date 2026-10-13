@@ -17,3 +17,13 @@ Append a section after each tranche (T0..T14) with: what was built, what tests p
 - NAVMath: Basket (amount0,amount1 only), proportionalBasket (round down), computePerformanceFee (zero on loss, capped, rounds down). Scaffold valueInToken0 noted.
 - Tests: 12 tests total across EnvelopeLib and NAVMath passing. Prove zero fee on loss, fee cap, proportional split, zero total shares.
 - Gates: fmt/build/test pass.
+
+## T2 (Hook - partial)
+- RudderHook skeleton implementing IHooks: vault gating in beforeAddLiquidity (only factory-created vault), paused guard, afterSwap writes TWAP observations to ring buffer, oracle helpers (isOracleReady, getLastObservation) with MIN_OBSERVATIONS=2 and MAX_OBSERVATION_AGE=1h. Hook permissions minimal.
+- Notes: TWAP staleness/min observations defined; withdrawals must never revert on bad oracle (enforced by vault logic later). Builder errors cleaned up for v4-core interface.
+- Gates: fmt ok, build in progress - minor interface signature nuance noted.
+
+## T2 (Hook - complete skeleton)
+- RudderHook implements IHooks (v4-core): beforeAddLiquidity gates to vaultFactory and enforces paused; afterSwap records TWAP observations (ring buffer, truncates to ~720 recent). Helpers isOracleReady/getLastObservation. Minimal permissions. 
+- Oracle safety note: withdrawals must never revert on bad oracle (to be enforced in vault; deposits/rebalances may revert).
+- Gates: fmt/build/test pass (12 tests).
