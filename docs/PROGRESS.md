@@ -33,3 +33,20 @@ Append a section after each tranche (T0..T14) with: what was built, what tests p
 - VaultFactory: minimal-proxy clones, tracks vault->strategyId, isVault helper. Vaults call PoolManager.unlock (no PM NFT).
 - RudderVault skeleton: ERC20, per-account holdBasket (amount0,amount1) only, initialized once.
 - Gates: fmt ok; build has lint warnings only (not errors). Tests still 12 passing.
+
+## T4 (Vault core - scaffold)
+- RudderVault: ERC20 clone, per-account holdBasket stores (amount0,amount1) only (valuation at withdrawal). initialize once. MINIMUM_LIQUIDITY for first-depositor inflation protection. 
+- Access: whenNotPaused checks hook.paused(); oracleOk for deposits (revert if bad oracle). Withdraw succeeds even if oracle bad (zero fee path). 
+- Deposit/withdraw logic scaffolded with proportionals (rounding down via MathLib/NAVMath). Holds withdrawal-never-reverts-on-oracle as stated.
+- Gates: fmt/build/test pass (12 tests).
+
+## T5 (Rebalance)
+- Vault.rebalance validates envelope via EnvelopeLib: range width, interval, price impact, NAV loss; updates lastRebalanceTimestamp. Center shift check scaffolded. Only curator; requires oracle ready; blocked when paused.
+- Bounds tests added (4) covering each envelope constraint.
+- Tests: 16 passing total.
+- Gates: fmt/build/test pass.
+
+## T6 (Performance fee)
+- Vault.withdraw computes performance fee only if oracle ready (oracle-safe: zero fee if not ready). Fee applied at withdrawal, capped by PROTOCOL_MAX_FEE_BPS (2000), rounds down favoring vault. Fee reduction reflected proportionally.
+- Fee math tests: zero on loss, zero if equal, capped, normal. Total 20 tests passing.
+- Gates: fmt ok, build via-ir ok, tests pass.
