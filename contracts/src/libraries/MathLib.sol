@@ -10,6 +10,7 @@ library MathLib {
     /// @dev Multiply then divide, rounding down (favors vault)
     function mulDivDown(uint256 a, uint256 b, uint256 denominator) internal pure returns (uint256) {
         if (denominator == 0) revert DivisionByZero();
+        if (a == 0 || b == 0) return 0;
         unchecked {
             uint256 prod = a * b;
             if (prod / a != b) revert Overflow();
@@ -20,10 +21,10 @@ library MathLib {
     /// @dev Multiply then divide, rounding up (favors LPs when claiming against vault, so we prefer down)
     function mulDivUp(uint256 a, uint256 b, uint256 denominator) internal pure returns (uint256) {
         if (denominator == 0) revert DivisionByZero();
+        if (a == 0 || b == 0) return 0;
         unchecked {
             uint256 prod = a * b;
             if (prod / a != b) revert Overflow();
-            if (prod == 0) return 0;
             return (prod - 1) / denominator + 1;
         }
     }

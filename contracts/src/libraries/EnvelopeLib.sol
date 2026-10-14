@@ -27,7 +27,8 @@ library EnvelopeLib {
     }
 
     function validateInterval(uint48 lastTs, uint48 nowTs, uint48 minInterval) internal pure {
-        if (nowTs < lastTs + minInterval) {
+        // Avoid overflow: use subtraction. If nowTs < lastTs, interval is invalid (too short).
+        if (nowTs < lastTs || (uint256(nowTs) - uint256(lastTs)) < uint256(minInterval)) {
             revert IntervalTooShort(lastTs, nowTs, minInterval);
         }
     }

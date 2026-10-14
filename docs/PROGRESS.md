@@ -62,3 +62,11 @@ Append a section after each tranche (T0..T14) with: what was built, what tests p
 - VaultMigrator: single-transaction migration from one vault to another (withdraw crystallizes fee, deposits into destination on behalf of LP), ReentrancyGuard, events.
 - Registry tests (5): register, instant tighten, timelocked loosen (revert-before/apply-after), alpha checkpoint, unauthorized checkpoint revert.
 - Tests: 27 passing total. Gates: fmt/build/test pass.
+
+## T8 (Hardening)
+- Fuzz/invariant suite (8 tests): envelope bounds always enforced; fee never exceeds cap; fee zero on loss; proportional basket never exceeds total and split conserves; interval enforcement.
+- Fuzzing caught two real bugs: (1) MathLib.mulDivDown/Up divided by zero when an operand was 0; (2) EnvelopeLib.validateInterval overflowed uint48 via `lastTs + minInterval`. Both fixed.
+- Gas snapshot recorded to contracts/.gas-snapshot.
+- FEEDBACK.md populated from real friction (BaseHook location, IHooks signature drift, getSlot0 absence, submodule recursion, via-ir need, no built-in TWAP helper, Foundry lint noise).
+- THREAT_MODEL.md: 13 threats with vector/mitigation/status; honest limitations; slither not installed so no static-analysis claims made.
+- Tests: 35 passing. Gates: fmt/build(via-ir)/test pass.
