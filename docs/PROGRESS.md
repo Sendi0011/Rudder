@@ -70,3 +70,30 @@ Append a section after each tranche (T0..T14) with: what was built, what tests p
 - FEEDBACK.md populated from real friction (BaseHook location, IHooks signature drift, getSlot0 absence, submodule recursion, via-ir need, no built-in TWAP helper, Foundry lint noise).
 - THREAT_MODEL.md: 13 threats with vector/mitigation/status; honest limitations; slither not installed so no static-analysis claims made.
 - Tests: 35 passing. Gates: fmt/build(via-ir)/test pass.
+
+## T8b (Integration - vault moves real assets)
+- `RudderVault` now custodies and moves real assets via `PoolManager.unlock`: `deposit` pulls both
+  tokens (balance-delta checked; fee-on-transfer refused) and mines a position; `withdraw` removes
+  liquidity and transfers pro-rata; `rebalance` removes + re-mines. Replaced the stubbed
+  `_getTotalHold0/1` and `_totalAssetsValue` with real accounting (idle balances + position amounts
+  + fees, all valued at the TWAP via new `LiquidityLib.valueInToken0`).
+- `rebalance(newTickLower, newTickUpper)` only; removed caller-supplied `priceImpactBps`/`navLossBps`.
+  Price impact (spot vs TWAP), center shift, and NAV before/after are measured on-chain. Tick-spacing
+  alignment enforced. One revert test per bound, each driven by a real execution.
+- `withdraw` burns exactly the redeemed shares, reduces the user's hold basket by `shares/userShares`,
+  values output at TWAP (never sums raw token0+token1), charges the fee only on positive gain, pays it
+  out, and pays zero when the oracle is not ready.
+- `RudderHook.setPaused` is now `onlyOwner` (was unrestricted); pause never blocks withdraw.
+  Added `consult(poolKey, secondsAgo)` TWAP view over the ring buffer.
+- `foundry.toml`: `via_ir = true` (required; withdraw otherwise hits "Stack too deep").
+- `VaultFactory`: added `vaultCount`, `vaults[]`, `vaultsLength()` for indexing and for the
+  bad-config test. Replaced `test_NoUninitializedCloneOnRevert` with `test_BadConfigRevertsAndRegistersNoVault`
+  (initialize reverting => no vault registered, `vaultCount == 0`).
+- New tests: `RudderIntegrationBase` (real PoolManager + ERC-20s + minimal swap router),
+  `Lifecycle.t.sol` (deposit->swap->rebalance->withdraw; one revert per bound; pause; free-share-mint,
+  false-metrics, first-depositor-inflation), `VaultInvariants.t.sol` (stateful share conservation,
+  fee-cap bound, envelope width never exceeded). `NAVMath.valueInToken0` placeholder removed (dead
+  code; superseded by `LiquidityLib`).
+- Tests: 53 passing. Gates: `forge fmt --check`, `forge build --via-ir`, `forge test --via-ir` pass.
+- Deferred to T9: networked fork test on Unichain Sepolia; deploy scripts with hook-salt mining
+  against the script's actual CREATE2 deployer (no scripts exist yet).

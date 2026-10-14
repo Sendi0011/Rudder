@@ -2,16 +2,58 @@
 pragma solidity 0.8.26;
 
 import {Test} from "forge-std/Test.sol";
+import {RudderTestBase} from "./RudderTestBase.sol";
 import {EnvelopeLib} from "../src/libraries/EnvelopeLib.sol";
 import {NAVMath} from "../src/libraries/NAVMath.sol";
 import {MathLib} from "../src/libraries/MathLib.sol";
+import {VaultFactory} from "../src/VaultFactory.sol";
+import {RudderVault} from "../src/RudderVault.sol";
+import {PoolKey} from "v4-core/types/PoolKey.sol";
+
+/// @notice Fuzz handler that ONLY creates vaults through VaultFactory. Configured via constructor so the
+///         fuzzer has no way to corrupt its wiring.
+contract VaultCreationHandler is Test {
+    VaultFactory internal f;
+    address internal cur;
+    PoolKey internal key;
+    uint256 internal sid;
+
+    address[] public vaults;
+
+    constructor(VaultFactory _f, address _c, PoolKey memory _k, uint256 _id) {
+        f = _f;
+        cur = _c;
+        key = _k;
+        sid = _id;
+    }
+
+    function createVault(uint16 feeCap) external {
+        vm.prank(cur);
+        address v = f.createVault(sid, key, feeCap);
+        vaults.push(v);
+    }
+
+    function vaultCount() external view returns (uint256) {
+        return vaults.length;
+    }
+}
 
 /// @title Invariants
-/// @notice Property/fuzz tests for core safety invariants:
-/// - envelope never violated (out-of-bounds always reverts)
-/// - fee never exceeds cap * gain
-/// - proportional basket never exceeds total (rounding favors vault)
-contract InvariantsTest is Test {
+/// @notice Property/fuzz tests. Vault-facing invariants ALWAYS create vaults through VaultFactory.
+contract InvariantsTest is RudderTestBase {
+    VaultCreationHandler internal handler;
+    uint256 internal strategyId;
+
+    function setUp() public override {
+        super.setUp();
+        strategyId = _registerStrategy(curator);
+
+        handler = new VaultCreationHandler(factory, curator, _poolKey(), strategyId);
+        targetContract(address(handler));
+    }
+
+    // --- pure library properties (unchanged) ---
+
     function checkRange(int24 width, int24 maxWidth) external pure {
         EnvelopeLib.validateRangeWidth(width, maxWidth);
     }
@@ -32,7 +74,6 @@ contract InvariantsTest is Test {
         EnvelopeLib.validateCenterShift(shift, maxShift);
     }
 
-    // Fuzz: any width > maxWidth must revert
     function testFuzz_rangeWidth_enforced(int24 width, int24 maxWidth) public {
         if (width > maxWidth) {
             vm.expectRevert();
@@ -42,7 +83,6 @@ contract InvariantsTest is Test {
         }
     }
 
-    // Fuzz: any impact > max must revert
     function testFuzz_priceImpact_enforced(uint32 impact, uint32 maxImpact) public {
         if (impact > maxImpact) {
             vm.expectRevert();
@@ -52,7 +92,6 @@ contract InvariantsTest is Test {
         }
     }
 
-    // Fuzz: nav loss below max must revert
     function testFuzz_navLoss_enforced(int24 loss, int24 maxLoss) public {
         if (loss < maxLoss) {
             vm.expectRevert();
@@ -62,7 +101,6 @@ contract InvariantsTest is Test {
         }
     }
 
-    // Fuzz: interval below min must revert
     function testFuzz_interval_enforced(uint48 lastTs, uint48 nowTs, uint48 minInterval) public {
         bool tooShort = nowTs < lastTs || (uint256(nowTs) - uint256(lastTs)) < uint256(minInterval);
         if (tooShort) {
@@ -73,7 +111,6 @@ contract InvariantsTest is Test {
         }
     }
 
-    // Fuzz: fee never exceeds cap * gain
     function testFuzz_fee_neverExceedsCap(uint256 gain, uint256 maxFeeBps, uint256 feeBps) public {
         gain = bound(gain, 0, 1e30);
         maxFeeBps = bound(maxFeeBps, 0, 10000);
@@ -85,7 +122,6 @@ contract InvariantsTest is Test {
         assertLe(fee, capAmount);
     }
 
-    // Fuzz: fee is zero on loss or equality
     function testFuzz_fee_zeroOnLoss(uint256 a, uint256 b) public {
         a = bound(a, 0, 1e30);
         b = bound(b, 0, 1e30);
@@ -95,7 +131,6 @@ contract InvariantsTest is Test {
         }
     }
 
-    // Fuzz: proportional basket never exceeds total (rounding favors vault/remaining)
     function testFuzz_proportional_neverExceeds(uint256 amount, uint256 shares, uint256 totalShares) public {
         amount = bound(amount, 0, 1e30);
         totalShares = bound(totalShares, 1, 1e30);
@@ -106,7 +141,6 @@ contract InvariantsTest is Test {
         assertLe(outB.amount1, amount);
     }
 
-    // Fuzz: proportional basket sums never exceed when split (conservation)
     function testFuzz_proportional_splitConservation(uint256 amount, uint256 s1, uint256 s2) public {
         amount = bound(amount, 0, 1e30);
         s1 = bound(s1, 0, 1e18);
@@ -116,7 +150,28 @@ contract InvariantsTest is Test {
         NAVMath.Basket memory total = NAVMath.Basket({amount0: amount, amount1: amount});
         NAVMath.Basket memory a = NAVMath.proportionalBasket(total, s1, totalShares);
         NAVMath.Basket memory b = NAVMath.proportionalBasket(total, s2, totalShares);
-        // Sum of parts must not exceed total (rounding down)
         assertLe(a.amount0 + b.amount0, amount);
+    }
+
+    // --- factory-created vault invariants ---
+
+    /// @notice Every vault produced by the handler is registered by the factory, bound to the
+    ///         strategy, and carries the strategy's curator.
+    function invariant_allCreatedVaultsRegistered() public view {
+        uint256 n = handler.vaultCount();
+        for (uint256 i = 0; i < n; i++) {
+            address v = handler.vaults(i);
+            assertTrue(factory.isVault(v), "vault must be registered");
+            assertEq(factory.vaultToStrategyId(v), strategyId, "vault bound to strategy");
+            assertEq(RudderVault(v).curator(), curator, "curator bound");
+        }
+    }
+
+    /// @notice Every factory-created vault clamps its fee cap to the protocol maximum.
+    function invariant_feeCapWithinProtocolMax() public view {
+        uint256 n = handler.vaultCount();
+        for (uint256 i = 0; i < n; i++) {
+            assertLe(RudderVault(handler.vaults(i)).feeCapBps(), factory.PROTOCOL_MAX_FEE_BPS(), "fee cap bounded");
+        }
     }
 }

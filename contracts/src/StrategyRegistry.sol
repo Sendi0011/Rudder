@@ -52,6 +52,10 @@ contract StrategyRegistry {
         return strategies[id].envelope;
     }
 
+    function getCurator(uint256 id) external view returns (address) {
+        return strategies[id].curator;
+    }
+
     function isCurator(uint256 id, address who) external view returns (bool) {
         return strategies[id].curator == who && strategies[id].active;
     }

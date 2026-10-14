@@ -20,12 +20,12 @@ Bounded-delegation hook plus vaults for curated liquidity on Uniswap v4.
 | 1 | Curator acts outside mandate | Out-of-bounds rebalance | `rebalance()` validates every bound via `EnvelopeLib`; out-of-bounds reverts with specific error | Implemented (T5) |
 | 2 | Curator drains LP funds | Withdraw/transfer | Curator has no withdraw rights; vault custody only | Implemented (design) |
 | 3 | Curator loosens envelope to rug LPs | Loosen bounds then act | Tightening instant; loosening timelocked (24h) so LPs can exit first | Implemented (T3) |
-| 4 | Oracle manipulation via thin liquidity | Spot price used as NAV | TWAP ring buffer written in `afterSwap`; price-impact bound is vs TWAP | Partial (T2, needs min-obs + age tests) |
-| 5 | Stale/absent oracle blocks withdrawals | Bad oracle state | Withdrawals NEVER revert on oracle; fee is zero if oracle not ready. Only deposits/rebalances revert | Implemented + test skeleton (T4, T6) |
-| 6 | First-depositor share inflation / donation attack | Donate to inflate share price | `MINIMUM_LIQUIDITY` lock on first deposit | Implemented scaffold (T4); dedicated test pending real accounting |
+| 4 | Oracle manipulation via thin liquidity | Spot price used as NAV | TWAP `consult()` over the `afterSwap` ring buffer; all NAV/fee/impact values use it; price-impact bound is vs TWAP | Implemented (T8b); min-obs + age enforcement in hook |
+| 5 | Stale/absent oracle blocks withdrawals | Bad oracle state | Withdrawals NEVER revert on oracle; fee is zero if oracle not ready. Only deposits/rebalances revert (first deposit/range-set bootstrap exempt) | Implemented + tested (T8b) |
+| 6 | First-depositor share inflation / donation attack | Donate to inflate share price | `MINIMUM_LIQUIDITY` (1000) locked on first deposit, so donations are absorbed by locked shares; test shows the attack is unprofitable | Implemented + tested (T8b) |
 | 7 | Fee overcharge | Curator sets excessive fee | Fee only on `max(0, value - hold)`; capped by `PROTOCOL_MAX_FEE_BPS`; crystallized at withdrawal | Implemented (T6) + fuzz (T8) |
 | 8 | Fake alpha / self-reported performance | Curator reports returns | Alpha computed on-chain vs hold benchmark; AUM/volume never feed ranking | Partial (T7) |
-| 9 | Reentrancy | Malicious token/hook callback | `ReentrancyGuard` on state-changing external fns; custom errors | Implemented (T4-T7) |
+| 9 | Reentrancy | Malicious token/hook callback | `ReentrancyGuard` on state-changing external fns; custom errors; `unlockCallback` is PoolManager-only | Implemented + tested (T8b) |
 | 10 | Rounding drains vault | Repeated tiny withdrawals | All rounding down favors vault/remaining LPs | Implemented + fuzz (T8) |
 | 11 | Pause used to trap LPs | Admin pauses withdrawals | Pause blocks deposits/rebalances only, never withdrawals | Implemented (T4) |
 | 12 | Integer overflow in interval math | `lastTs + minInterval` overflows uint48 | Rewritten as subtraction; caught by fuzz | Fixed (T8) |
@@ -34,10 +34,14 @@ Bounded-delegation hook plus vaults for curated liquidity on Uniswap v4.
 ## Known limitations (honest)
 - The hold benchmark rewards any LP return above hold, including what a passive LP would
   earn. It is an honest lower bound, not a claim of skill-sourcing.
-- Envelope center-shift check is scaffolded and must use actual pre/post centers (T5 completion).
+- Envelope center-shift check now uses actual pre/post centers (T8b). NAV-loss bound realistically
+  only catches rounding at a same-price re-centre (see OPEN_QUESTIONS.md).
 - TWAP ring buffer truncation uses an in-place shift; gas review pending (T8/T9).
 - Fork tests against the real PoolManager on Unichain Sepolia are not yet run; official
-  addresses are unverified and tracked in OPEN_QUESTIONS.md.
+  addresses are verified and recorded in OPEN_QUESTIONS.md. T8b ships a local integration test
+  against the canonical (in-process) v4 `PoolManager`; a networked fork is a T9 item.
+- No deploy scripts exist yet; T8b item 8 (mine hook salts against the script's actual CREATE2
+  deployer) is carried into T9 (see OPEN_QUESTIONS.md).
 
 ## Slither triage
 `slither` is not installed in this environment (`slither: command not found`), so no

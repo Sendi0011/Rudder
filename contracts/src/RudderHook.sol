@@ -12,6 +12,10 @@ import {ModifyLiquidityParams, SwapParams} from "v4-core/types/PoolOperation.sol
 import {ReentrancyGuard} from "openzeppelin-contracts/contracts/utils/ReentrancyGuard.sol";
 import {StateLibrary} from "v4-core/libraries/StateLibrary.sol";
 
+interface IVaultFactory {
+    function isVault(address who) external view returns (bool);
+}
+
 /// @title RudderHook
 contract RudderHook is IHooks, ReentrancyGuard {
     using PoolIdLibrary for PoolKey;
@@ -19,6 +23,7 @@ contract RudderHook is IHooks, ReentrancyGuard {
 
     error OnlyVault();
     error Paused();
+    error Unauthorized();
 
     struct Observation {
         uint32 timestamp;
@@ -32,25 +37,29 @@ contract RudderHook is IHooks, ReentrancyGuard {
 
     IPoolManager public immutable poolManager;
     address public immutable vaultFactory;
+    address public owner;
     bool public paused;
 
     constructor(IPoolManager _manager, address _vaultFactory) {
         poolManager = _manager;
         vaultFactory = _vaultFactory;
+        owner = msg.sender;
         Hooks.validateHookPermissions(this, getHookPermissions());
     }
 
-    function setPaused(bool _paused) external {
+    modifier onlyOwner() {
+        if (msg.sender != owner) revert Unauthorized();
+        _;
+    }
+
+    /// @notice Pause/unpause deposit and rebalance. Withdrawals are never gated by `paused`.
+    function setPaused(bool _paused) external onlyOwner {
         paused = _paused;
     }
 
     modifier onlyPoolManager() {
         if (msg.sender != address(poolManager)) revert();
         _;
-    }
-
-    function _getVault() internal view returns (address) {
-        return vaultFactory;
     }
 
     function isOracleReady(PoolKey calldata key) public view returns (bool) {
@@ -68,6 +77,32 @@ contract RudderHook is IHooks, ReentrancyGuard {
         if (obs.length == 0) return (0, 0);
         Observation storage last = obs[obs.length - 1];
         return (last.timestamp, last.sqrtPriceX96);
+    }
+
+    /// @notice Time-weighted average sqrtPriceX96 over the last `secondsAgo`, built from the
+    ///         afterSwap observation ring buffer. Values each stored sample by the duration it
+    ///         was the last observed price. Reverts nothing; returns the latest sample if the
+    ///         window contains no observations.
+    function consult(PoolKey calldata key, uint32 secondsAgo) external view returns (uint160 sqrtPriceX96) {
+        Observation[] storage obs = _observations[key.toId()];
+        uint256 n = obs.length;
+        if (n == 0) return 0;
+
+        uint256 windowStart = block.timestamp > secondsAgo ? block.timestamp - secondsAgo : 0;
+        uint256 prevTs = block.timestamp;
+        uint256 sumDt;
+        uint256 sumWeighted;
+        // Walk backwards from newest until we pass the start of the window.
+        for (uint256 i = n; i > 0; i--) {
+            Observation storage o = obs[i - 1];
+            if (o.timestamp <= windowStart) break;
+            uint256 dt = prevTs - o.timestamp;
+            sumWeighted += uint256(o.sqrtPriceX96) * dt;
+            sumDt += dt;
+            prevTs = o.timestamp;
+        }
+        if (sumDt == 0) return obs[n - 1].sqrtPriceX96;
+        return uint160(sumWeighted / sumDt);
     }
 
     function getHookPermissions() public pure returns (Hooks.Permissions memory) {
@@ -102,7 +137,7 @@ contract RudderHook is IHooks, ReentrancyGuard {
         onlyPoolManager
         returns (bytes4)
     {
-        if (sender != _getVault()) revert OnlyVault();
+        if (!IVaultFactory(vaultFactory).isVault(sender)) revert OnlyVault();
         if (paused) revert Paused();
         return IHooks.beforeAddLiquidity.selector;
     }
