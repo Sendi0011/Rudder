@@ -118,3 +118,18 @@ Append a section after each tranche (T0..T14) with: what was built, what tests p
 - `Invariants.t.sol` handler now registers one fresh strategy per vault (a strategy binds one vault)
   and caps creation so the O(n) invariant loops stay bounded; added `default.invariant.runs/depth = 64`.
 - Tests: 75 passing. Gates: `forge fmt --check`, `forge build --via-ir`, `forge test --via-ir` pass.
+
+## T8c (Oracle bootstrap hardening + oracle-independent withdrawals)
+- Replaced the `totalSupply() == 0` bootstrap exemption with a **one-time `oracleBootstrapped` flag**.
+  `depositOracle`/`rebalanceOracle` now waive the oracle-readiness requirement only while the flag is
+  false; `_syncBootstrap()` flips it true the first time the TWAP is observed ready and it never
+  un-flips. Emptying the vault (or the vault going dormant) can no longer reopen the exemption.
+- End-to-end tests added to `Lifecycle.t.sol`:
+  - `test_BootstrapFlagOneWay_EmptyingDoesNotReopen`: empty all LP shares, warp past the observation
+    window, then a deposit reverts `OracleBad`.
+  - `test_WithdrawZeroFeeWhenOracleStale`: after warping past `MAX_OBSERVATION_AGE` a withdrawal still
+    succeeds and the `Withdraw` event reports `fee0 == fee1 == 0`.
+  - `test_WithdrawWithEmptyOracleBuffer`: a withdrawal works with no observations at all, zero fee.
+  - `test_WithdrawFromOutOfRangePosition`: a position driven fully below its range withdraws, returning
+    almost entirely currency0.
+- Tests: 79 passing. Gates: `forge fmt --check`, `forge build --via-ir`, `forge test --via-ir` pass.

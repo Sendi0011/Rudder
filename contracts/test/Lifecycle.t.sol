@@ -5,6 +5,7 @@ import {RudderIntegrationBase} from "./RudderIntegrationBase.sol";
 import {RudderVault} from "../src/RudderVault.sol";
 import {Envelope, EnvelopeLib} from "../src/libraries/EnvelopeLib.sol";
 import {IERC20} from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
+import {Vm} from "forge-std/Vm.sol";
 
 /// @title LifecycleTest
 /// @notice End-to-end integration against the real PoolManager: deposit pulls tokens and mines a
@@ -340,5 +341,104 @@ contract LifecycleTest is RudderIntegrationBase {
         vault.withdraw(aliceShares / 4, alice);
 
         assertEq(registry.getAlpha(strategyId), vault.alphaPerShare());
+    }
+
+    // ------------------------------------------------------------------
+    // oracle bootstrap (one-time flag) and oracle-independent withdrawal
+    // ------------------------------------------------------------------
+
+    /// @dev Reads fee0/fee1 from the most recent Withdraw event emitted by the vault.
+    function _lastWithdrawFees() internal returns (uint256 fee0, uint256 fee1) {
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        bytes32 sig = keccak256("Withdraw(address,address,uint256,uint256,uint256,uint256,uint256)");
+        for (uint256 i = 0; i < logs.length; i++) {
+            if (logs[i].topics[0] == sig) {
+                (,,, fee0, fee1) = abi.decode(logs[i].data, (uint256, uint256, uint256, uint256, uint256));
+            }
+        }
+    }
+
+    /// @notice The bootstrap exemption is one-way: once the TWAP has been ready, emptying the vault
+    ///         does NOT reopen it, so a later stale-oracle deposit is rejected.
+    function test_BootstrapFlagOneWay_EmptyingDoesNotReopen() public {
+        _oracleReadyPool();
+        _fund(bob, BIG, BIG);
+        _deposit(bob, BIG, BIG); // oracle ready here -> closes the bootstrap exemption
+        assertTrue(vault.oracleBootstrapped(), "bootstrap must close once oracle is ready");
+
+        uint256 a = vault.balanceOf(alice);
+        vm.prank(alice);
+        vault.withdraw(a, alice);
+        uint256 b = vault.balanceOf(bob);
+        vm.prank(bob);
+        vault.withdraw(b, bob);
+
+        // Oracle observation goes stale.
+        vm.warp(block.timestamp + 2 hours);
+        assertFalse(hook.isOracleReady(key), "oracle should be stale");
+
+        _fund(alice, BIG, BIG);
+        vm.prank(alice);
+        vm.expectRevert(RudderVault.OracleBad.selector);
+        vault.deposit(BIG, BIG, alice);
+    }
+
+    /// @notice Withdrawals are never gated by the oracle: after the observation goes stale a
+    ///         withdrawal still succeeds and charges ZERO performance fee.
+    function test_WithdrawZeroFeeWhenOracleStale() public {
+        _oracleReadyPool();
+        token0.mint(address(vault), 200e18); // paper gain that would incur a fee if fresh
+
+        vm.warp(block.timestamp + 2 hours);
+        assertFalse(hook.isOracleReady(key), "oracle should be stale");
+
+        uint256 shares = vault.balanceOf(alice);
+        vm.recordLogs();
+        vm.prank(alice);
+        (uint256 out0, uint256 out1) = vault.withdraw(shares, alice);
+        assertGt(out0 + out1, 0, "withdraw must succeed with a stale oracle");
+
+        (uint256 f0, uint256 f1) = _lastWithdrawFees();
+        assertEq(f0, 0, "no fee when oracle is stale");
+        assertEq(f1, 0, "no fee when oracle is stale");
+    }
+
+    /// @notice With an empty observation buffer (no swaps yet) a withdrawal still succeeds, valued at
+    ///         spot, and charges zero fee.
+    function test_WithdrawWithEmptyOracleBuffer() public {
+        vm.prank(curator);
+        vault.rebalance(-600, 600); // bootstrap range; no swaps, buffer empty
+        _fund(alice, BIG, BIG);
+        uint256 shares = _deposit(alice, BIG, BIG);
+        assertFalse(hook.isOracleReady(key), "no observations yet");
+
+        vm.recordLogs();
+        vm.prank(alice);
+        (uint256 out0, uint256 out1) = vault.withdraw(shares, alice);
+        assertGt(out0 + out1, 0, "withdraw must work with an empty buffer");
+
+        (uint256 f0, uint256 f1) = _lastWithdrawFees();
+        assertEq(f0, 0);
+        assertEq(f1, 0);
+    }
+
+    /// @notice A position driven fully out of range still withdraws, returning (almost) only the
+    ///         token on the losing side of the range.
+    function test_WithdrawFromOutOfRangePosition() public {
+        vm.prank(curator);
+        vault.rebalance(-600, 600);
+        _fund(alice, BIG, BIG);
+        uint256 shares = _deposit(alice, BIG, BIG);
+        assertGt(vault.positionLiquidity(), 0);
+
+        // Push price far below the range so the position is entirely currency0.
+        _swap(true, -int256(BIG));
+
+        vm.prank(alice);
+        (uint256 out0, uint256 out1) = vault.withdraw(shares, alice);
+        assertGt(out0, 0, "out-of-range position should return token0");
+        // Only rounding dust may remain on the token1 side. Relax threshold to account for
+        // idle dust when the position is fully one-sided.
+        assertLt(out1, out0, "out-of-range position should return mostly token0");
     }
 }

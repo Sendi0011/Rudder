@@ -85,6 +85,10 @@ contract RudderVault is Initializable, ERC20, ReentrancyGuard, IUnlockCallback {
     int24 public tickUpper;
     uint128 public positionLiquidity;
     bool public rangeSet;
+    /// @notice One-time flag marking the end of the oracle-bootstrap phase. While false, the
+    ///         oracle-readiness requirement is waived for deposit/rebalance. Once true, it remains
+    ///         true forever and operations require the TWAP ring buffer to be ready.
+    bool public oracleBootstrapped;
 
     mapping(address => Basket) public holdBasket;
 
@@ -161,17 +165,27 @@ contract RudderVault is Initializable, ERC20, ReentrancyGuard, IUnlockCallback {
         _;
     }
 
-    /// @dev Deposits require a ready oracle, EXCEPT the very first deposit that bootstraps the pool
-    ///      (a TWAP cannot exist before there is liquidity to swap against).
+    /// @dev Deposits require a ready oracle once bootstrapped. Bootstrap is controlled by a
+    ///      one-time flag (not totalSupply) to prevent reopening after emptying the vault.
     modifier depositOracle() {
-        if (totalSupply() > 0 && !IRudderHook(hook).isOracleReady(poolKey)) revert OracleBad();
+        _syncBootstrap();
+        if (oracleBootstrapped && !IRudderHook(hook).isOracleReady(poolKey)) revert OracleBad();
         _;
     }
 
-    /// @dev Rebalances require a ready oracle, except the initial range-set that bootstraps the position.
+    /// @dev Rebalances require a ready oracle once bootstrapped.
     modifier rebalanceOracle() {
-        if (rangeSet && !IRudderHook(hook).isOracleReady(poolKey)) revert OracleBad();
+        _syncBootstrap();
+        if (oracleBootstrapped && !IRudderHook(hook).isOracleReady(poolKey)) revert OracleBad();
         _;
+    }
+
+    /// @dev Closes the one-time bootstrap exemption as soon as the TWAP is ready. The flag is
+    ///      one-way: emptying the vault (or the vault going dormant) can never reopen it.
+    function _syncBootstrap() internal {
+        if (!oracleBootstrapped && IRudderHook(hook).isOracleReady(poolKey)) {
+            oracleBootstrapped = true;
+        }
     }
 
     modifier onlyCurator() {
