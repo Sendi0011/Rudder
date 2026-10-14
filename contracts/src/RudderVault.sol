@@ -100,6 +100,11 @@ contract RudderVault is Initializable, ERC20, ReentrancyGuard, IUnlockCallback {
     ///         shares. Used to emit deltas to the registry.
     int256 public lastAlpha;
 
+    /// @notice Curator fees accrued but not yet claimed (pull-based). Kept in-vault and excluded from
+    ///         NAV, so a fee recipient that rejects transfers can never block a withdrawal.
+    uint256 public pendingFees0;
+    uint256 public pendingFees1;
+
     uint256 public constant MINIMUM_LIQUIDITY = 1000;
     uint256 public constant PROTOCOL_MAX_FEE_BPS = 2000;
     uint256 public lastRebalanceTimestamp;
@@ -115,6 +120,7 @@ contract RudderVault is Initializable, ERC20, ReentrancyGuard, IUnlockCallback {
         uint256 fee1
     );
     event Rebalance(uint256 indexed strategyId, int24 tickLower, int24 tickUpper, uint128 liquidity);
+    event FeesClaimed(address indexed recipient, uint256 amount0, uint256 amount1);
 
     /// @dev Clone metadata cannot be written by the implementation constructor, so name/symbol are fixed.
     constructor() ERC20("Rudder Vault Share", "RVS") {
@@ -254,8 +260,8 @@ contract RudderVault is Initializable, ERC20, ReentrancyGuard, IUnlockCallback {
 
         if (positionLiquidity > 0) _collect();
 
-        uint256 idle0 = _idle0();
-        uint256 idle1 = _idle1();
+        uint256 idle0 = _freeIdle0();
+        uint256 idle1 = _freeIdle1();
         uint256 removed0;
         uint256 removed1;
         if (positionLiquidity > 0) {
@@ -270,23 +276,41 @@ contract RudderVault is Initializable, ERC20, ReentrancyGuard, IUnlockCallback {
         uint256 total1 = removed1 + MathLib.mulDivDown(idle1, shares, supply);
 
         Basket memory hb = holdBasket[msg.sender];
-        (uint256 fee0, uint256 fee1) = _performanceFee(hb, total0, total1);
+        // The hold benchmark is compared like-for-like: pro-rate the account's basket to the shares
+        // being redeemed, so partial withdrawals are charged fairly (not deferred to a full exit).
+        uint256 hb0 = MathLib.mulDivDown(hb.amount0, shares, userShares);
+        uint256 hb1 = MathLib.mulDivDown(hb.amount1, shares, userShares);
+        (uint256 fee0, uint256 fee1) = _performanceFee(Basket({amount0: hb0, amount1: hb1}), total0, total1);
         amount0Out = total0 - fee0;
         amount1Out = total1 - fee1;
 
         _burn(msg.sender, shares);
-        holdBasket[msg.sender].amount0 = hb.amount0 - MathLib.mulDivDown(hb.amount0, shares, userShares);
-        holdBasket[msg.sender].amount1 = hb.amount1 - MathLib.mulDivDown(hb.amount1, shares, userShares);
+        holdBasket[msg.sender].amount0 = hb.amount0 - hb0;
+        holdBasket[msg.sender].amount1 = hb.amount1 - hb1;
         totalHold.amount0 -= MathLib.mulDivDown(totalHold.amount0, shares, supply);
         totalHold.amount1 -= MathLib.mulDivDown(totalHold.amount1, shares, supply);
 
         if (amount0Out > 0) IERC20(Currency.unwrap(poolKey.currency0)).transfer(recipient, amount0Out);
         if (amount1Out > 0) IERC20(Currency.unwrap(poolKey.currency1)).transfer(recipient, amount1Out);
-        if (fee0 > 0) IERC20(Currency.unwrap(poolKey.currency0)).transfer(feeRecipient, fee0);
-        if (fee1 > 0) IERC20(Currency.unwrap(poolKey.currency1)).transfer(feeRecipient, fee1);
+        // Fees are accrued for pull-claim; the transfer is never attempted during a withdrawal.
+        pendingFees0 += fee0;
+        pendingFees1 += fee1;
 
         _checkpointAlpha();
         emit Withdraw(msg.sender, recipient, shares, amount0Out, amount1Out, fee0, fee1);
+    }
+
+    /// @notice Claim accrued curator fees (pull-based). A fee recipient that rejects transfers only
+    ///         blocks its own claim, never an LP withdrawal.
+    function claimFees() external nonReentrant returns (uint256 amount0, uint256 amount1) {
+        if (msg.sender != feeRecipient) revert NotCurator();
+        amount0 = pendingFees0;
+        amount1 = pendingFees1;
+        pendingFees0 = 0;
+        pendingFees1 = 0;
+        if (amount0 > 0) IERC20(Currency.unwrap(poolKey.currency0)).transfer(feeRecipient, amount0);
+        if (amount1 > 0) IERC20(Currency.unwrap(poolKey.currency1)).transfer(feeRecipient, amount1);
+        emit FeesClaimed(feeRecipient, amount0, amount1);
     }
 
     /// @notice Move the position within the envelope. Metrics are measured on-chain (never trusted
@@ -411,11 +435,22 @@ contract RudderVault is Initializable, ERC20, ReentrancyGuard, IUnlockCallback {
         int24 hi = tickUpper;
         uint160 sqrtA = TickMath.getSqrtPriceAtTick(lo);
         uint160 sqrtB = TickMath.getSqrtPriceAtTick(hi);
-        liquidity = LiquidityLib.getLiquidityForAmounts(sqrtP, sqrtA, sqrtB, _idle0(), _idle1());
+        // Only deploy LP-owned idle; pending curator fees stay liquid and claimable.
+        liquidity = LiquidityLib.getLiquidityForAmounts(sqrtP, sqrtA, sqrtB, _freeIdle0(), _freeIdle1());
         if (liquidity > 0) {
             _addLiquidity(liquidity);
             positionLiquidity += liquidity;
         }
+    }
+
+    function _freeIdle0() internal view returns (uint256) {
+        uint256 b = _idle0();
+        return b > pendingFees0 ? b - pendingFees0 : 0;
+    }
+
+    function _freeIdle1() internal view returns (uint256) {
+        uint256 b = _idle1();
+        return b > pendingFees1 ? b - pendingFees1 : 0;
     }
 
     // ---------------------------------------------------------------------
@@ -434,6 +469,9 @@ contract RudderVault is Initializable, ERC20, ReentrancyGuard, IUnlockCallback {
             (uint256 p0, uint256 p1) = _positionAmounts(sqrtP);
             value0 += LiquidityLib.valueInToken0(p0, p1, sqrtP);
         }
+        // Pending curator fees are a liability: exclude them from LP-owned NAV.
+        uint256 liability = LiquidityLib.valueInToken0(pendingFees0, pendingFees1, sqrtP);
+        value0 = value0 > liability ? value0 - liability : 0;
     }
 
     function _positionAmounts(uint160 sqrtP) internal view returns (uint256 amount0, uint256 amount1) {

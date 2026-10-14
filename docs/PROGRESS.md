@@ -133,3 +133,17 @@ Append a section after each tranche (T0..T14) with: what was built, what tests p
   - `test_WithdrawFromOutOfRangePosition`: a position driven fully below its range withdraws, returning
     almost entirely currency0.
 - Tests: 79 passing. Gates: `forge fmt --check`, `forge build --via-ir`, `forge test --via-ir` pass.
+
+## T8d (Pull-based curator fees + pro-rata fee accounting)
+- Curator fees are now **pull-based**: a withdrawal accrues fees into `pendingFees0/1` and never
+  transfers to the fee recipient, so a recipient that rejects transfers can never block an LP
+  withdrawal. New `claimFees()` (fee-recipient only) pays out accrued fees and emits `FeesClaimed`.
+- Pending fees are a liability: excluded from `_totalAssetsValue` (NAV/alpha), excluded from the
+  pro-rata idle paid to withdrawing LPs, and excluded from idle deployed into the position
+  (`_freeIdle0/1`). They therefore cannot be captured by other LPs or swept into the position.
+- **Bug fixed (found by a new test):** on a *partial* withdrawal the performance fee compared the
+  partial output against the account's *full* hold basket, so partial exits never charged a fee.
+  The hold basket is now pro-rated to the redeemed shares before the comparison.
+- Tests added: fees accrue and are pull-claimed (recipient balance unchanged during withdraw); only
+  the fee recipient may claim; another LP cannot capture the curator's pending fees.
+- Tests: 82 passing. Gates: `forge fmt --check`, `forge build --via-ir`, `forge test --via-ir` pass.

@@ -441,4 +441,70 @@ contract LifecycleTest is RudderIntegrationBase {
         // idle dust when the position is fully one-sided.
         assertLt(out1, out0, "out-of-range position should return mostly token0");
     }
+
+    // ------------------------------------------------------------------
+    // pull-based curator fees
+    // ------------------------------------------------------------------
+
+    /// @notice Fees are accrued on withdraw, not pushed to the fee recipient, and can be pulled.
+    function test_CuratorFeesArePullBased() public {
+        _oracleReadyPool();
+        token0.mint(address(vault), 200e18); // gain that yields a performance fee
+
+        uint256 curator0Before = token0.balanceOf(curator);
+        uint256 curator1Before = token1.balanceOf(curator);
+
+        uint256 shares = vault.balanceOf(alice);
+        vm.prank(alice);
+        vault.withdraw(shares, alice);
+
+        uint256 pf0 = vault.pendingFees0();
+        uint256 pf1 = vault.pendingFees1();
+        assertGt(pf0 + pf1, 0, "fee should accrue");
+        assertEq(token0.balanceOf(curator), curator0Before, "no push to recipient during withdraw");
+        assertEq(token1.balanceOf(curator), curator1Before, "no push to recipient during withdraw");
+
+        vm.prank(curator);
+        vault.claimFees();
+        assertEq(token0.balanceOf(curator), curator0Before + pf0, "curator receives accrued fee0");
+        assertEq(token1.balanceOf(curator), curator1Before + pf1, "curator receives accrued fee1");
+        assertEq(vault.pendingFees0(), 0);
+        assertEq(vault.pendingFees1(), 0);
+    }
+
+    /// @notice Only the fee recipient may claim.
+    function test_ClaimFees_OnlyFeeRecipient() public {
+        _oracleReadyPool();
+        token0.mint(address(vault), 200e18);
+        uint256 shares = vault.balanceOf(alice);
+        vm.prank(alice);
+        vault.withdraw(shares, alice);
+
+        vm.prank(alice);
+        vm.expectRevert(RudderVault.NotCurator.selector);
+        vault.claimFees();
+    }
+
+    /// @notice Pending fees are excluded from NAV and from other LPs' withdrawals: a second LP cannot
+    ///         capture the curator's accrued fees.
+    function test_PendingFeesNotCapturedByOtherLPs() public {
+        _oracleReadyPool();
+        token0.mint(address(vault), 200e18);
+        uint256 aliceShares = vault.balanceOf(alice);
+        vm.prank(alice);
+        vault.withdraw(aliceShares / 2, alice);
+
+        uint256 pf0 = vault.pendingFees0();
+        uint256 pf1 = vault.pendingFees1();
+        assertGt(pf0 + pf1, 0);
+
+        _fund(bob, BIG, BIG);
+        _deposit(bob, BIG, BIG);
+        uint256 bobShares = vault.balanceOf(bob);
+        vm.prank(bob);
+        vault.withdraw(bobShares, bob);
+
+        assertGe(vault.pendingFees0(), pf0, "pending fee0 must not be captured by another LP");
+        assertGe(vault.pendingFees1(), pf1, "pending fee1 must not be captured by another LP");
+    }
 }
