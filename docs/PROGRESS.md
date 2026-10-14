@@ -97,3 +97,24 @@ Append a section after each tranche (T0..T14) with: what was built, what tests p
 - Tests: 53 passing. Gates: `forge fmt --check`, `forge build --via-ir`, `forge test --via-ir` pass.
 - Deferred to T9: networked fork test on Unichain Sepolia; deploy scripts with hook-salt mining
   against the script's actual CREATE2 deployer (no scripts exist yet).
+
+## T7 completion (Ranking - wired end to end)
+- `StrategyRegistry` now has an `owner` (deployer) and a `factory` set once via `setFactory`.
+  `setStrategyVault(id, vault)` is gated on `msg.sender == factory`, reverts `UnknownStrategy` for an
+  unknown id and `StrategyAlreadyBound` if the strategy already has a vault. A strategy can never be
+  hijacked to a second vault, and the curator can no longer rebind it.
+- `VaultFactory.createVault` binds the freshly initialized vault to its strategy atomically
+  (`registry.setStrategyVault`), so the vault is authorised to checkpoint the moment it exists.
+- `RudderVault` now keeps a global aggregate hold basket (`totalHold`) updated on deposit (+=) and
+  withdraw (pro-rata -=), and computes `alphaPerShare() = NAV-per-share - hold-value-per-share` at the
+  TWAP, scaled to 1e18 shares.
+- Alpha is checkpointed **automatically** at the end of `deposit`, `withdraw`, and `rebalance`
+  (`_checkpointAlpha` emits the delta vs the last checkpoint to `registry.checkpointAlpha`). It is
+  never curator-triggered and is skipped while the oracle is not ready (no trustworthy benchmark).
+- Tests added: registry factory-set once / only-owner; vault bind only-factory / already-bound /
+  unknown-strategy; factory propagates `StrategyAlreadyBound`; integration — factory binds vault,
+  first deposit skips checkpoint until the oracle is ready, and deposit/withdraw/rebalance each write a
+  checkpoint whose cumulative value equals the vault's live `alphaPerShare()`.
+- `Invariants.t.sol` handler now registers one fresh strategy per vault (a strategy binds one vault)
+  and caps creation so the O(n) invariant loops stay bounded; added `default.invariant.runs/depth = 64`.
+- Tests: 75 passing. Gates: `forge fmt --check`, `forge build --via-ir`, `forge test --via-ir` pass.

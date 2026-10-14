@@ -10,6 +10,9 @@ contract StrategyRegistry {
     error InvalidParams();
     error TimelockNotReady();
     error NoPendingChange();
+    error FactoryAlreadySet();
+    error StrategyAlreadyBound();
+    error UnknownStrategy();
 
     struct Strategy {
         address curator;
@@ -35,11 +38,30 @@ contract StrategyRegistry {
     mapping(uint256 => address) public strategyVault;
     uint256 public nextStrategyId;
 
+    /// @notice Deployer; may set the factory address exactly once.
+    address public owner;
+    /// @notice The only address allowed to bind a vault to a strategy.
+    address public factory;
+
     event StrategyRegistered(uint256 indexed id, address indexed curator);
     event EnvelopeTightened(uint256 indexed id);
     event EnvelopeLooseningQueued(uint256 indexed id, uint256 unlockTime);
     event EnvelopeLooseningApplied(uint256 indexed id);
     event AlphaCheckpointed(uint256 indexed id, int256 alphaDelta, int256 cumulativeAlpha);
+    event FactorySet(address indexed factory);
+    event StrategyVaultBound(uint256 indexed id, address indexed vault);
+
+    constructor() {
+        owner = msg.sender;
+    }
+
+    /// @notice Set the factory that may bind vaults. Callable once by the deployer.
+    function setFactory(address _factory) external {
+        if (msg.sender != owner) revert Unauthorized();
+        if (factory != address(0) || _factory == address(0)) revert FactoryAlreadySet();
+        factory = _factory;
+        emit FactorySet(_factory);
+    }
 
     function registerStrategy(Envelope calldata env) external returns (uint256 id) {
         if (env.maxRangeWidth <= 0 || env.minRebalanceInterval == 0) revert InvalidParams();
@@ -85,10 +107,15 @@ contract StrategyRegistry {
         emit EnvelopeLooseningApplied(id);
     }
 
-    /// @notice Bind a vault to a strategy (called by factory/vault). Enables alpha checkpointing.
+    /// @notice Bind a vault to a strategy. Only the factory may call, exactly once per strategy.
+    /// @dev Called by VaultFactory during `createVault`, atomically with initialization. Reverts if
+    ///      the strategy already has a vault, so a strategy can never be hijacked to a second vault.
     function setStrategyVault(uint256 id, address vault) external {
-        if (strategies[id].curator != msg.sender) revert Unauthorized();
+        if (msg.sender != factory) revert Unauthorized();
+        if (strategies[id].curator == address(0)) revert UnknownStrategy();
+        if (strategyVault[id] != address(0)) revert StrategyAlreadyBound();
         strategyVault[id] = vault;
+        emit StrategyVaultBound(id, vault);
     }
 
     /// @notice Record a cumulative alpha checkpoint. Only the bound vault may call.

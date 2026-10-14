@@ -27,6 +27,7 @@ interface IRudderHook {
 interface IStrategyRegistry {
     function getEnvelope(uint256 id) external view returns (Envelope memory);
     function isCurator(uint256 id, address who) external view returns (bool);
+    function checkpointAlpha(uint256 id, int256 alphaDelta) external;
 }
 
 /// @title RudderVault
@@ -86,6 +87,14 @@ contract RudderVault is Initializable, ERC20, ReentrancyGuard, IUnlockCallback {
     bool public rangeSet;
 
     mapping(address => Basket) public holdBasket;
+
+    /// @notice Aggregate hold basket (sum of deposits, reduced pro-rata on withdraw). The vault-level
+    ///         hold benchmark used for alpha checkpoints.
+    Basket public totalHold;
+
+    /// @notice NAV-per-share minus hold-value-per-share at the last checkpoint, in token0 wei per 1e18
+    ///         shares. Used to emit deltas to the registry.
+    int256 public lastAlpha;
 
     uint256 public constant MINIMUM_LIQUIDITY = 1000;
     uint256 public constant PROTOCOL_MAX_FEE_BPS = 2000;
@@ -212,6 +221,9 @@ contract RudderVault is Initializable, ERC20, ReentrancyGuard, IUnlockCallback {
         Basket storage hb = holdBasket[recipient];
         hb.amount0 += amount0;
         hb.amount1 += amount1;
+        totalHold.amount0 += amount0;
+        totalHold.amount1 += amount1;
+        _checkpointAlpha();
         emit Deposit(msg.sender, recipient, amount0, amount1, shares);
     }
 
@@ -251,12 +263,15 @@ contract RudderVault is Initializable, ERC20, ReentrancyGuard, IUnlockCallback {
         _burn(msg.sender, shares);
         holdBasket[msg.sender].amount0 = hb.amount0 - MathLib.mulDivDown(hb.amount0, shares, userShares);
         holdBasket[msg.sender].amount1 = hb.amount1 - MathLib.mulDivDown(hb.amount1, shares, userShares);
+        totalHold.amount0 -= MathLib.mulDivDown(totalHold.amount0, shares, supply);
+        totalHold.amount1 -= MathLib.mulDivDown(totalHold.amount1, shares, supply);
 
         if (amount0Out > 0) IERC20(Currency.unwrap(poolKey.currency0)).transfer(recipient, amount0Out);
         if (amount1Out > 0) IERC20(Currency.unwrap(poolKey.currency1)).transfer(recipient, amount1Out);
         if (fee0 > 0) IERC20(Currency.unwrap(poolKey.currency0)).transfer(feeRecipient, fee0);
         if (fee1 > 0) IERC20(Currency.unwrap(poolKey.currency1)).transfer(feeRecipient, fee1);
 
+        _checkpointAlpha();
         emit Withdraw(msg.sender, recipient, shares, amount0Out, amount1Out, fee0, fee1);
     }
 
@@ -311,6 +326,7 @@ contract RudderVault is Initializable, ERC20, ReentrancyGuard, IUnlockCallback {
         EnvelopeLib.validateNavLoss(_navLossBps(preNav, postNav), env.maxNavLossBps);
 
         lastRebalanceTimestamp = uint48(block.timestamp);
+        _checkpointAlpha();
         emit Rebalance(strategyId, newTickLower, newTickUpper, positionLiquidity);
     }
 
@@ -410,6 +426,34 @@ contract RudderVault is Initializable, ERC20, ReentrancyGuard, IUnlockCallback {
         uint160 sqrtA = TickMath.getSqrtPriceAtTick(tickLower);
         uint160 sqrtB = TickMath.getSqrtPriceAtTick(tickUpper);
         return LiquidityLib.getAmountsForLiquidity(sqrtP, sqrtA, sqrtB, positionLiquidity);
+    }
+
+    /// @notice Current alpha of the vault: NAV-per-share minus hold-value-per-share, both valued at
+    ///         TWAP and scaled to 1e18 shares. Positive means the vault beat its hold benchmark.
+    function alphaPerShare() external view returns (int256) {
+        if (!IRudderHook(hook).isOracleReady(poolKey)) return lastAlpha;
+        uint256 supply = totalSupply();
+        if (supply == 0) return 0;
+        uint160 sqrtP = _twapSqrtPrice();
+        uint256 nav = _totalAssetsValue();
+        uint256 holdValue = LiquidityLib.valueInToken0(totalHold.amount0, totalHold.amount1, sqrtP);
+        return int256(MathLib.mulDivDown(nav, 1e18, supply)) - int256(MathLib.mulDivDown(holdValue, 1e18, supply));
+    }
+
+    /// @dev Records the change in alpha-vs-hold to the registry. Runs automatically on every
+    ///      deposit/withdraw/rebalance (never curator-triggered). Skipped while the oracle is not
+    ///      ready, since a checkpoint requires a trustworthy TWAP.
+    function _checkpointAlpha() internal {
+        if (!IRudderHook(hook).isOracleReady(poolKey)) return;
+        uint256 supply = totalSupply();
+        if (supply == 0) return;
+        uint160 sqrtP = _twapSqrtPrice();
+        uint256 nav = _totalAssetsValue();
+        uint256 holdValue = LiquidityLib.valueInToken0(totalHold.amount0, totalHold.amount1, sqrtP);
+        int256 alpha =
+            int256(MathLib.mulDivDown(nav, 1e18, supply)) - int256(MathLib.mulDivDown(holdValue, 1e18, supply));
+        IStrategyRegistry(registry).checkpointAlpha(strategyId, alpha - lastAlpha);
+        lastAlpha = alpha;
     }
 
     function _performanceFee(Basket memory hb, uint256 total0, uint256 total1)

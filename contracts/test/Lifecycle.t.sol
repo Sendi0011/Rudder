@@ -262,4 +262,83 @@ contract LifecycleTest is RudderIntegrationBase {
         (uint256 o0, uint256 o1) = v.withdraw(attackerShares, attacker);
         assertLe(o0 + o1, attackerIn, "donation attack profitable");
     }
+
+    // ------------------------------------------------------------------
+    // alpha ranking: automatic checkpointing (never curator-triggered)
+    // ------------------------------------------------------------------
+
+    /// @notice The factory binds the freshly created vault to its strategy at creation time.
+    function test_FactoryBindsVaultToStrategy() public view {
+        assertEq(registry.strategyVault(strategyId), address(vault), "factory must bind vault");
+        assertEq(vault.strategyId(), strategyId, "vault must know its strategy");
+    }
+
+    /// @notice Before the TWAP exists there is no trustworthy benchmark, so no checkpoint is written
+    ///         (but the deposit itself must still succeed).
+    function test_FirstDepositSkipsAlphaCheckpointUntilOracleReady() public {
+        vm.prank(curator);
+        vault.rebalance(-600, 600); // bootstrap range, oracle not yet ready
+        _fund(alice, BIG, BIG);
+        uint256 shares = _deposit(alice, BIG, BIG);
+
+        assertGt(shares, 0, "deposit must work before oracle ready");
+        assertEq(registry.getAlpha(strategyId), 0, "no checkpoint before TWAP exists");
+        (uint256 h0, uint256 h1) = vault.totalHold();
+        assertEq(h0, BIG, "hold basket tracks token0");
+        assertEq(h1, BIG, "hold basket tracks token1");
+    }
+
+    /// @notice A deposit writes an alpha checkpoint; a donation raises NAV but not the hold basket,
+    ///         so cumulative alpha must rise and match the vault's live computation.
+    function test_AlphaCheckpointedOnDeposit() public {
+        _oracleReadyPool(); // makes TWAP trustworthy via swaps
+        int256 before = registry.getAlpha(strategyId);
+
+        // Donation inflates NAV relative to the hold benchmark.
+        token0.mint(address(vault), 100e18);
+        _fund(bob, BIG, BIG);
+        _deposit(bob, BIG, BIG);
+
+        int256 alpha = registry.getAlpha(strategyId);
+        assertGt(alpha, before, "donation must increase alpha");
+        assertGt(alpha, 0, "vault beating hold after donation");
+        assertEq(alpha, vault.alphaPerShare(), "registry cumulative alpha == live alpha");
+    }
+
+    /// @notice A withdrawal also checkpoints, using the post-burn share supply.
+    function test_AlphaCheckpointedOnWithdraw() public {
+        _oracleReadyPool();
+        uint256 shares = vault.balanceOf(alice);
+        assertGt(shares, 0);
+
+        token0.mint(address(vault), 100e18);
+        vm.prank(alice);
+        vault.withdraw(shares / 2, alice);
+
+        assertEq(registry.getAlpha(strategyId), vault.alphaPerShare(), "withdraw must checkpoint alpha");
+    }
+
+    /// @notice A rebalance checkpoints too, so alpha always reflects the current NAV.
+    function test_AlphaCheckpointedOnRebalance() public {
+        _oracleReadyPool();
+        token0.mint(address(vault), 100e18);
+        vm.prank(curator);
+        vault.rebalance(-300, 300);
+
+        assertEq(registry.getAlpha(strategyId), vault.alphaPerShare(), "rebalance must checkpoint alpha");
+    }
+
+    /// @notice The vault accumulates checkpoint deltas; it never writes a raw absolute alpha.
+    ///         Cumulative alpha must equal the current per-share alpha after any sequence.
+    function test_AlphaCumulativeEqualsLive() public {
+        _oracleReadyPool();
+        token0.mint(address(vault), 100e18);
+        _fund(bob, BIG, BIG);
+        _deposit(bob, BIG, BIG);
+        uint256 aliceShares = vault.balanceOf(alice);
+        vm.prank(alice);
+        vault.withdraw(aliceShares / 4, alice);
+
+        assertEq(registry.getAlpha(strategyId), vault.alphaPerShare());
+    }
 }

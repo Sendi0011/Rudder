@@ -3,10 +3,11 @@ pragma solidity 0.8.26;
 
 import {Test} from "forge-std/Test.sol";
 import {RudderTestBase} from "./RudderTestBase.sol";
-import {EnvelopeLib} from "../src/libraries/EnvelopeLib.sol";
+import {EnvelopeLib, Envelope} from "../src/libraries/EnvelopeLib.sol";
 import {NAVMath} from "../src/libraries/NAVMath.sol";
 import {MathLib} from "../src/libraries/MathLib.sol";
 import {VaultFactory} from "../src/VaultFactory.sol";
+import {StrategyRegistry} from "../src/StrategyRegistry.sol";
 import {RudderVault} from "../src/RudderVault.sol";
 import {PoolKey} from "v4-core/types/PoolKey.sol";
 
@@ -14,32 +15,51 @@ import {PoolKey} from "v4-core/types/PoolKey.sol";
 ///         fuzzer has no way to corrupt its wiring.
 contract VaultCreationHandler is Test {
     VaultFactory internal f;
+    StrategyRegistry internal reg;
     address internal cur;
     PoolKey internal key;
-    uint256 internal sid;
+    Envelope internal env;
 
     address[] public vaults;
+    uint256[] internal sids;
 
-    constructor(VaultFactory _f, address _c, PoolKey memory _k, uint256 _id) {
+    /// @dev Cap vault creation so the O(n) invariant loops stay bounded across fuzz runs.
+    uint256 internal constant MAX_VAULTS = 16;
+
+    constructor(VaultFactory _f, StrategyRegistry _reg, address _c, PoolKey memory _k, Envelope memory _env) {
         f = _f;
+        reg = _reg;
         cur = _c;
         key = _k;
-        sid = _id;
+        env = _env;
     }
 
+    /// @dev One fresh strategy per vault, since a strategy may bind at most one vault.
     function createVault(uint16 feeCap) external {
+        if (vaults.length >= MAX_VAULTS) return;
+        vm.prank(cur);
+        uint256 sid = reg.registerStrategy(env);
         vm.prank(cur);
         address v = f.createVault(sid, key, feeCap);
         vaults.push(v);
+        sids.push(sid);
     }
 
     function vaultCount() external view returns (uint256) {
         return vaults.length;
     }
+
+    function strategyIdFor(uint256 i) external view returns (uint256) {
+        return sids[i];
+    }
 }
 
 /// @title Invariants
 /// @notice Property/fuzz tests. Vault-facing invariants ALWAYS create vaults through VaultFactory.
+/// @dev The invariant functions loop over every created vault, so the search is bounded to keep the
+///      suite tractable while still exercising factory-created vaults.
+/// forge-config: default.invariant.runs = 64
+/// forge-config: default.invariant.depth = 64
 contract InvariantsTest is RudderTestBase {
     VaultCreationHandler internal handler;
     uint256 internal strategyId;
@@ -48,7 +68,7 @@ contract InvariantsTest is RudderTestBase {
         super.setUp();
         strategyId = _registerStrategy(curator);
 
-        handler = new VaultCreationHandler(factory, curator, _poolKey(), strategyId);
+        handler = new VaultCreationHandler(factory, registry, curator, _poolKey(), _envelope());
         targetContract(address(handler));
     }
 
@@ -162,7 +182,7 @@ contract InvariantsTest is RudderTestBase {
         for (uint256 i = 0; i < n; i++) {
             address v = handler.vaults(i);
             assertTrue(factory.isVault(v), "vault must be registered");
-            assertEq(factory.vaultToStrategyId(v), strategyId, "vault bound to strategy");
+            assertEq(factory.vaultToStrategyId(v), handler.strategyIdFor(i), "vault bound to strategy");
             assertEq(RudderVault(v).curator(), curator, "curator bound");
         }
     }

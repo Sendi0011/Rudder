@@ -12,6 +12,7 @@ import {IPoolManager} from "v4-core/interfaces/IPoolManager.sol";
 import {PoolKey} from "v4-core/types/PoolKey.sol";
 import {ModifyLiquidityParams} from "v4-core/types/PoolOperation.sol";
 import {Envelope} from "../src/libraries/EnvelopeLib.sol";
+import {StrategyRegistry} from "../src/StrategyRegistry.sol";
 
 /// @dev Implementation whose initializer always reverts, used to prove a failed initialization
 ///      leaves nothing registered behind.
@@ -110,6 +111,13 @@ contract FactoryInitTest is RudderTestBase {
         vm.prank(curator);
         address vault = factory.createVault(strategyId, _poolKey(), 5000);
         assertEq(RudderVault(vault).feeCapBps(), factory.PROTOCOL_MAX_FEE_BPS(), "fee cap clamped");
+    }
+
+    function test_CreateVault_SecondVaultForStrategyReverts() public {
+        _createVault(strategyId, curator);
+        vm.prank(curator);
+        vm.expectRevert(StrategyRegistry.StrategyAlreadyBound.selector);
+        factory.createVault(strategyId, _poolKey(), 1000);
     }
 
     function test_BadConfigRevertsAndRegistersNoVault() public {

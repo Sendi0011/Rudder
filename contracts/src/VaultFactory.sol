@@ -9,6 +9,7 @@ import {Envelope} from "./libraries/EnvelopeLib.sol";
 interface IStrategyRegistryView {
     function getCurator(uint256 id) external view returns (address);
     function getEnvelope(uint256 id) external view returns (Envelope memory);
+    function setStrategyVault(uint256 id, address vault) external;
 }
 
 interface IRudderVaultInit {
@@ -96,6 +97,10 @@ contract VaultFactory {
                 poolKey,
                 envelope
             );
+
+        // Bind the freshly initialized vault to its strategy. The registry reverts if the strategy
+        // already has a vault, so a strategy can never point at two vaults.
+        registry.setStrategyVault(strategyId, vault);
 
         emit VaultCreated(vault, strategyId, curator, poolKey);
     }

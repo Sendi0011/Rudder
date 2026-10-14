@@ -69,10 +69,53 @@ contract RegistryTest is Test {
         assertEq(registry.getEnvelope(id).maxRangeWidth, 2000);
     }
 
+    address factory = address(0xFAC);
+
+    function test_SetFactory_Once() public {
+        registry.setFactory(factory);
+        assertEq(registry.factory(), factory);
+        vm.expectRevert(StrategyRegistry.FactoryAlreadySet.selector);
+        registry.setFactory(address(0xBAD));
+    }
+
+    function test_SetFactory_OnlyOwner() public {
+        vm.prank(address(0xB0B));
+        vm.expectRevert(StrategyRegistry.Unauthorized.selector);
+        registry.setFactory(factory);
+    }
+
+    function test_BindVault_OnlyFactory() public {
+        vm.prank(curator);
+        uint256 id = registry.registerStrategy(_env());
+        registry.setFactory(factory);
+        vm.prank(curator);
+        vm.expectRevert(StrategyRegistry.Unauthorized.selector);
+        registry.setStrategyVault(id, vault);
+    }
+
+    function test_BindVault_RevertsIfAlreadyBound() public {
+        vm.prank(curator);
+        uint256 id = registry.registerStrategy(_env());
+        registry.setFactory(factory);
+        vm.prank(factory);
+        registry.setStrategyVault(id, vault);
+        vm.prank(factory);
+        vm.expectRevert(StrategyRegistry.StrategyAlreadyBound.selector);
+        registry.setStrategyVault(id, address(0xABCD));
+    }
+
+    function test_BindVault_RevertsForUnknownStrategy() public {
+        registry.setFactory(factory);
+        vm.prank(factory);
+        vm.expectRevert(StrategyRegistry.UnknownStrategy.selector);
+        registry.setStrategyVault(999, vault);
+    }
+
     function test_CheckpointAlpha() public {
         vm.prank(curator);
         uint256 id = registry.registerStrategy(_env());
-        vm.prank(curator);
+        registry.setFactory(factory);
+        vm.prank(factory);
         registry.setStrategyVault(id, vault);
         vm.prank(vault);
         registry.checkpointAlpha(id, 100);

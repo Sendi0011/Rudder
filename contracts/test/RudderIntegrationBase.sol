@@ -103,6 +103,7 @@ abstract contract RudderIntegrationBase is Test {
         registry = new StrategyRegistry();
         vaultImpl = new RudderVault();
         factory = new VaultFactory(address(vaultImpl), IPoolManager(address(manager)), address(registry));
+        registry.setFactory(address(factory));
         hook = _deployMinedHook();
 
         key = PoolKey({
