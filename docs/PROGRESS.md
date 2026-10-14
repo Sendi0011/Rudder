@@ -50,3 +50,15 @@ Append a section after each tranche (T0..T14) with: what was built, what tests p
 - Vault.withdraw computes performance fee only if oracle ready (oracle-safe: zero fee if not ready). Fee applied at withdrawal, capped by PROTOCOL_MAX_FEE_BPS (2000), rounds down favoring vault. Fee reduction reflected proportionally.
 - Fee math tests: zero on loss, zero if equal, capped, normal. Total 20 tests passing.
 - Gates: fmt ok, build via-ir ok, tests pass.
+
+## T7 (Ranking and migration - scaffold)
+- Ranking: alpha-vs-hold (checkpointed concept noted; view logic scaffolded). AUM/volume display-only.
+- Migration: one-tx migration concept (structure in place; full implementation in T7 completion).
+- Added test skeletons for oracle-safe withdrawals and share inflation protection (first-depositor). 
+- Tests: 22 passing total.
+
+## T7 (Ranking and migration - implementation)
+- StrategyRegistry: added cumulative alpha-vs-hold checkpointing (checkpointAlpha, getAlpha), strategy<->vault binding (setStrategyVault), events. AUM/volume explicitly not part of ranking.
+- VaultMigrator: single-transaction migration from one vault to another (withdraw crystallizes fee, deposits into destination on behalf of LP), ReentrancyGuard, events.
+- Registry tests (5): register, instant tighten, timelocked loosen (revert-before/apply-after), alpha checkpoint, unauthorized checkpoint revert.
+- Tests: 27 passing total. Gates: fmt/build/test pass.

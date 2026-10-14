@@ -22,16 +22,24 @@ contract StrategyRegistry {
         uint256 unlockTime;
     }
 
+    struct Ranking {
+        int256 cumulativeAlpha; // alpha vs hold, cumulative
+        uint256 checkpointTs; // last checkpoint timestamp
+    }
+
     uint256 public constant LOOSEN_DELAY = 24 hours;
 
     mapping(uint256 => Strategy) public strategies;
     mapping(uint256 => PendingEnvelope) public pendingEnvelope;
+    mapping(uint256 => Ranking) public rankings;
+    mapping(uint256 => address) public strategyVault;
     uint256 public nextStrategyId;
 
     event StrategyRegistered(uint256 indexed id, address indexed curator);
     event EnvelopeTightened(uint256 indexed id);
     event EnvelopeLooseningQueued(uint256 indexed id, uint256 unlockTime);
     event EnvelopeLooseningApplied(uint256 indexed id);
+    event AlphaCheckpointed(uint256 indexed id, int256 alphaDelta, int256 cumulativeAlpha);
 
     function registerStrategy(Envelope calldata env) external returns (uint256 id) {
         if (env.maxRangeWidth <= 0 || env.minRebalanceInterval == 0) revert InvalidParams();
@@ -71,5 +79,26 @@ contract StrategyRegistry {
         strategies[id].envelope = p.envelope;
         delete pendingEnvelope[id];
         emit EnvelopeLooseningApplied(id);
+    }
+
+    /// @notice Bind a vault to a strategy (called by factory/vault). Enables alpha checkpointing.
+    function setStrategyVault(uint256 id, address vault) external {
+        if (strategies[id].curator != msg.sender) revert Unauthorized();
+        strategyVault[id] = vault;
+    }
+
+    /// @notice Record a cumulative alpha checkpoint. Only the bound vault may call.
+    /// @dev Ranking is alpha-vs-hold over lookback; AUM/volume never feed this.
+    function checkpointAlpha(uint256 id, int256 alphaDelta) external {
+        if (strategyVault[id] != msg.sender) revert Unauthorized();
+        Ranking storage r = rankings[id];
+        r.cumulativeAlpha += alphaDelta;
+        r.checkpointTs = block.timestamp;
+        emit AlphaCheckpointed(id, alphaDelta, r.cumulativeAlpha);
+    }
+
+    /// @notice Cumulative alpha-vs-hold for a strategy (the single ranking number)
+    function getAlpha(uint256 id) external view returns (int256) {
+        return rankings[id].cumulativeAlpha;
     }
 }

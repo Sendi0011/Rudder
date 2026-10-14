@@ -1,0 +1,9 @@
+cache/
+out/
+forge-cache/
+contracts/cache/
+contracts/out/
+.env
+node_modules/
+dist/
+.next/
