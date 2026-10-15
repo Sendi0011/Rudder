@@ -147,3 +147,11 @@ Append a section after each tranche (T0..T14) with: what was built, what tests p
 - Tests added: fees accrue and are pull-claimed (recipient balance unchanged during withdraw); only
   the fee recipient may claim; another LP cannot capture the curator's pending fees.
 - Tests: 82 passing. Gates: `forge fmt --check`, `forge build --via-ir`, `forge test --via-ir` pass.
+
+## T8e (Stateful solvency invariant)
+- Added `twapSqrtPrice()` public view so tests can value holdings at the exact price the vault uses.
+- New stateful invariant `invariant_HoldingsCoverRedemptions`: over 256 runs x 128k calls of
+  deposit/withdraw/swap/rebalance, the vault's real holdings (idle + position valued at TWAP) always
+  cover the reported LP NAV plus curator pending fees; curator fees are always backed by idle
+  balances; and the sum of every holder's pro-rata claim never exceeds NAV (no over-redemption).
+- Tests: 83 passing. Gates: `forge fmt --check`, `forge build --via-ir`, `forge test --via-ir` pass.

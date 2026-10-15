@@ -462,6 +462,11 @@ contract RudderVault is Initializable, ERC20, ReentrancyGuard, IUnlockCallback {
         return _totalAssetsValue();
     }
 
+    /// @notice The TWAP sqrt price this vault values assets at (falls back to spot if untracked).
+    function twapSqrtPrice() external view returns (uint160) {
+        return _twapSqrtPrice();
+    }
+
     function _totalAssetsValue() internal view returns (uint256 value0) {
         uint160 sqrtP = _twapSqrtPrice();
         value0 = LiquidityLib.valueInToken0(_idle0(), _idle1(), sqrtP);

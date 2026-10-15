@@ -11,6 +11,9 @@ import {PoolKey} from "v4-core/types/PoolKey.sol";
 import {TickMath} from "v4-core/libraries/TickMath.sol";
 import {IERC20} from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {TestERC20} from "v4-core/test/TestERC20.sol";
+import {LiquidityLib} from "../src/libraries/LiquidityLib.sol";
+import {MathLib} from "../src/libraries/MathLib.sol";
+import {Currency} from "v4-core/types/Currency.sol";
 
 /// @notice Drives the vault through randomized deposit/withdraw/swap/rebalance against the real
 ///         PoolManager. All actions are bounded so they are expected to succeed (never revert),
@@ -149,6 +152,45 @@ contract VaultInvariantsTest is RudderIntegrationBase {
         if (vault.rangeSet()) {
             Envelope memory env = registry.getEnvelope(strategyId);
             assertLe(vault.tickUpper() - vault.tickLower(), env.maxRangeWidth, "range exceeds envelope");
+        }
+    }
+
+    /// @notice Solvency: the vault's real holdings (idle + position, valued at the same TWAP the vault
+    ///         uses) must cover what it reports as LP-owned NAV plus the curator's pending fees. In
+    ///         other words the vault never promises a redemption it cannot back with tokens.
+    function invariant_HoldingsCoverRedemptions() public view {
+        uint160 sqrtP = vault.twapSqrtPrice();
+
+        uint256 idle0 = IERC20(Currency.unwrap(key.currency0)).balanceOf(address(vault));
+        uint256 idle1 = IERC20(Currency.unwrap(key.currency1)).balanceOf(address(vault));
+        uint256 holdings = LiquidityLib.valueInToken0(idle0, idle1, sqrtP);
+        if (vault.positionLiquidity() > 0) {
+            (uint256 p0, uint256 p1) = LiquidityLib.getAmountsForLiquidity(
+                sqrtP,
+                TickMath.getSqrtPriceAtTick(vault.tickLower()),
+                TickMath.getSqrtPriceAtTick(vault.tickUpper()),
+                vault.positionLiquidity()
+            );
+            holdings += LiquidityLib.valueInToken0(p0, p1, sqrtP);
+        }
+
+        uint256 pending = LiquidityLib.valueInToken0(vault.pendingFees0(), vault.pendingFees1(), sqrtP);
+        uint256 nav = vault.totalAssetsValue();
+        // LP NAV plus curator fees must be backed by real holdings (rounding-tolerant).
+        assertLe(nav + pending, holdings + 1, "nav + pending fees must be backed by holdings");
+
+        // Curator fees are always claimable from idle balances.
+        assertGe(idle0, vault.pendingFees0(), "pending fee0 not backed by idle tokens");
+        assertGe(idle1, vault.pendingFees1(), "pending fee1 not backed by idle tokens");
+
+        // No over-redemption: the sum of every holder's pro-rata claim cannot exceed LP NAV.
+        uint256 supply = vault.totalSupply();
+        if (supply > 0) {
+            uint256 sumClaims;
+            for (uint256 i = 0; i < actors.length; i++) {
+                sumClaims += MathLib.mulDivDown(nav, vault.balanceOf(actors[i]), supply);
+            }
+            assertLe(sumClaims, nav, "holders cannot collectively redeem more than NAV");
         }
     }
 }
