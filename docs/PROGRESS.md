@@ -155,3 +155,15 @@ Append a section after each tranche (T0..T14) with: what was built, what tests p
   cover the reported LP NAV plus curator pending fees; curator fees are always backed by idle
   balances; and the sum of every holder's pro-rata claim never exceeds NAV (no over-redemption).
 - Tests: 83 passing. Gates: `forge fmt --check`, `forge build --via-ir`, `forge test --via-ir` pass.
+
+## T8f (Pre-(b) prerequisites: CI profile, fresh-clone verification)
+- Added foundry `[profile.ci]` (inherits compiler settings from default, reduces fuzz to 128 runs
+  and invariant to 32 runs x depth 32 so CI stays fast). `.github/workflows/ci.yml` now sets
+  `FOUNDRY_PROFILE=ci` for build + test.
+- Verified a **fresh clone**: `git clone --recurse-submodules <repo>` into a clean directory builds
+  (`FOUNDRY_PROFILE=ci forge build`) and passes the full suite — **83 tests, 0 failed, 36.5s**
+  (vs ~184-245s under the default profile). The fresh clone's `v4-periphery` submodule is **clean**,
+  confirming the ` m contracts/lib/v4-periphery` seen locally is benign nested-submodule pointer
+  drift, not committed state (see FEEDBACK.md §8).
+- Default-profile gates remain green: `forge fmt --check`, `forge build --via-ir`,
+  `forge test --via-ir` (83 tests).

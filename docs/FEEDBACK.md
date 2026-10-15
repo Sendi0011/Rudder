@@ -47,3 +47,20 @@ deserves a documented reference implementation.
 `screaming-snake-case-immutable`, `unwrapped-modifier-logic`) mixed into compiler output.
 These are fine to have, but they obscure real compiler errors in logs; a separate
 `forge lint` stream would be cleaner.
+
+## 8. Nested submodule pointer drift shows `v4-periphery` as dirty
+`v4-periphery` vendors its own `lib/v4-core` and `lib/permit2`, and `permit2` in turn vendors
+`forge-std`, `openzeppelin-contracts` and `solmate` — three levels of nested submodules. After
+running `git submodule update --init --recursive`, the *nested* pointers can end up ahead of
+what the parent pins, so `git status` reports ` m contracts/lib/v4-periphery` even though no
+source file changed:
+
+- `v4-periphery` pins `lib/v4-core` at `59d3ecf5`, while our working tree has the same v4-core
+  commit the top-level repo pins (`46c68346`, v4.0.0-21) → ` M lib/v4-core`.
+- `lib/permit2` reports ` m` because its own submodules are checked out ahead of its pins.
+
+This is benign pointer drift with no source modifications and no effect on the build (imports
+resolve through the top-level `v4-core` via remappings). It is also *local*: a fresh
+`git clone --recurse-submodules` reproduces a clean `v4-periphery` (verified). The friction is
+that a plain `git status` in a vendored-v4 project is misleading until you inspect the nested
+`git -C contracts/lib/v4-periphery status`.

@@ -13,3 +13,9 @@ fs_permissions = [{ access = "read", path = "./" }, { access = "read-write", pat
 [fmt]
 line_length = 120
 tab_width = 4
+
+# Reduced-run profile for CI: same compiler settings, lighter fuzz/invariant search so the
+# pipeline stays fast while still exercising every suite. Activate with FOUNDRY_PROFILE=ci.
+[profile.ci]
+fuzz = { runs = 128 }
+invariant = { runs = 32, depth = 32 }
