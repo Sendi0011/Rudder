@@ -167,3 +167,22 @@ Append a section after each tranche (T0..T14) with: what was built, what tests p
   drift, not committed state (see FEEDBACK.md §8).
 - Default-profile gates remain green: `forge fmt --check`, `forge build --via-ir`,
   `forge test --via-ir` (83 tests).
+
+## T9 (Deploy script + networked fork test)
+- `contracts/script/Deploy.s.sol`: deploys `StrategyRegistry`, `RudderVault` implementation,
+  `VaultFactory`, then mines a CREATE2 salt **at runtime** against the same deployer Foundry uses for
+  `new Hook{salt}` (`0x4e59b44847b379578588920cA78FbF26c0B4956C`) and deploys `RudderHook` at an
+  address whose low 14 bits encode `beforeAddLiquidity | afterSwap` (`0x840`). It asserts the
+  deployed address equals the mined address, wires `registry.setFactory`, and writes
+  `contracts/deployments.json`. `POOL_MANAGER` defaults to the verified Unichain Sepolia address.
+- Verified offline: `forge script contracts/script/Deploy.s.sol:Deploy` (no `--broadcast`) deploys
+  successfully and mines salt `25385` → hook `0x31937254B5a3f183D637604002168F1309020840`
+  (low bits `0840`). deployments.json restored afterward.
+- `contracts/test/Fork.t.sol`: full lifecycle (deposit → two real swaps for TWAP → rebalance →
+  deposit → withdraw) against the **real** Unichain Sepolia PoolManager. Skipped (not failed) when
+  `UNICHAIN_SEPOLIA_RPC_URL` is unset, so offline/CI runs stay green.
+- Tests: 83 passing, 1 skipped (fork). Gates: `forge fmt --check`, `forge build --via-ir`,
+  `forge test --via-ir`.
+- **Not yet run against the live network**: the fork test was not executed with a real RPC (none
+  configured). It compiles and its setup/deploy path is exercised by the offline script run; the
+  on-chain execution remains to be run when an RPC is available. See OPEN_QUESTIONS.md.

@@ -14,6 +14,14 @@ Record anything that cannot be verified (official Unichain Sepolia v4 addresses,
 - [ ] TWAP thresholds (min observations, max age) - TBD in T2 (with tests)
 - [ ] minRebalanceInterval, envelope bounds defaults - TBD in T3/T5
 
+## T9 (2026-10-15)
+- [ ] Fork test vs live Unichain Sepolia not yet executed: no RPC configured. `contracts/test/Fork.t.sol`
+      compiles and is skipped (not failed) when `UNICHAIN_SEPOLIA_RPC_URL` is unset. Run with:
+      `UNICHAIN_SEPOLIA_RPC_URL=<rpc> forge test --match-contract ForkLifecycleTest -vvv`.
+- [ ] Deploy script was exercised only as an offline dry-run (`forge script ...:Deploy`, no broadcast);
+      a real broadcast to Unichain Sepolia remains to be done when an RPC + funded key are available.
+      The hook salt is mined at runtime against the CREATE2 deployer so it can never go stale.
+
 ## Resolved by T8b (2026-10-14)
 - [x] Deposit/rebalance oracle bootstrap. A pool cannot have a TWAP before it has liquidity to
       swap against, so the vault's FIRST deposit and FIRST range-set bypass the "oracle ready" gate.
