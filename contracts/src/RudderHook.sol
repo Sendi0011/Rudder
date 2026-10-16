@@ -151,8 +151,8 @@ contract RudderHook is IHooks, ReentrancyGuard {
         PoolId id = key.toId();
         Oracle storage o = _oracle[id];
 
-        // One sample per timestamp: the first swap of a block fixes the sample at the honest
-        // pre-swap price, and any later swap in the same block cannot overwrite it.
+        // One sample per timestamp: the first swap of a block fixes the sample at the pre-swap
+        // price, and any later swap in the same block cannot overwrite it.
         if (o.count > 0 && _newest(o).timestamp == uint32(block.timestamp)) return;
 
         (uint160 sqrtPriceX96,,,) = poolManager.getSlot0(id);

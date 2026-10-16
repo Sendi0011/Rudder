@@ -1,13 +1,14 @@
 # Known Limitations
 
-Honest boundaries of the current Rudder implementation. Nothing here is a hidden caveat:
+Boundaries of the current Rudder implementation. Nothing here is a hidden caveat:
 each item is either an accepted design trade-off or work that is not yet done.
 
 ## Design trade-offs
 
 - **The hold benchmark is intentionally lenient.** Alpha is measured against simply holding the
   deposited assets, so a curator is credited for any return above hold, including what a passive
-  LP would earn. It is an honest lower bound on value added, not a claim of skill-sourcing.
+  LP would earn. This overstates active skill: the benchmark does not isolate skill from beta, from
+  passive LP yield, or from the pool's own price path.
 - **The NAV-loss bound is realistically a rounding guard.** Positions are valued at the TWAP before
   and after a rebalance, so a same-price re-centre preserves NAV to first order. Envelope authors
   should not rely on `maxNavLossBps` for large drawdown protection.
@@ -21,6 +22,24 @@ each item is either an accepted design trade-off or work that is not yet done.
   against, so the vault's first deposit and first range-set bypass the oracle-readiness gate. Every
   subsequent deposit and rebalance requires a ready oracle; the exemption is a one-way flag that
   never re-opens.
+
+## Resolved
+
+- **Alpha history is bounded.** A vault reports its cumulative alpha on every action, but samples are
+  persisted into a fixed-capacity ring (720 slots) at most once per `CHECKPOINT_INTERVAL`, so a
+  strategy that acts every block can no longer grow storage without bound. The score is the live
+  accumulator minus the oldest sample still inside the 30-day lookback window.
+- **Ranking is return-based, not level-based.** The score is a cumulative per-interval
+  `vaultReturn − holdReturn` fraction rather than a raw price difference, so vaults of different size
+  and token decimals are comparable on the same scale.
+- **Mid-window flows no longer distort the score.** The interval is accrued from the pre-action
+  baseline and the baseline is rebased afterwards, so a large deposit or withdrawal inside the window
+  is never mistaken for performance.
+- **Deposits are capped by a protocol ceiling.** The spot-vs-TWAP deviation bound on deposits is the
+  tighter of the strategy envelope and `PROTOCOL_MAX_PRICE_IMPACT_BPS`, so a curator cannot disable the
+  guard by widening its own envelope.
+- **A registry failure cannot block exits.** The vault reports alpha best-effort, so a revert in the
+  registry never turns a withdrawal into a revert.
 
 ## Not yet done
 

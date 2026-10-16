@@ -49,5 +49,5 @@ curator-operated vaults that steer a single LP range inside an on-chain mandate.
   distance from the TWAP tick) is violated.
 - Pause suppresses deposits and rebalances and never affects withdrawals.
 
-See `THREAT_MODEL.md` for the threat/ mitigation table, `KNOWN_LIMITATIONS.md` for honest
+See `THREAT_MODEL.md` for the threat/ mitigation table, `KNOWN_LIMITATIONS.md` for the known
 boundaries, and `adr/ADR-001-architecture.md` for the decisions behind this layout.

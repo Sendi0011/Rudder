@@ -10,10 +10,11 @@ badness never blocks withdrawals.
 - **Manipulation-resistant oracle.** `RudderHook` samples prices in `beforeSwap` (the pre-swap
   price), one sample per timestamp, and serves a time-weighted average. A swapper cannot choose the
   price it is recorded at.
-- **Honest performance fees.** Fees apply only to `max(0, value − hold)` at the TWAP, are capped, and
-  crystallize at withdrawal. A stale oracle yields zero fee.
+- **Hold-benchmarked performance fees.** Fees apply only to `max(0, value − hold)` at the TWAP, are
+  capped, and crystallize at withdrawal. A stale oracle yields zero fee. The benchmark is deliberately
+  lenient: any return above a passive hold counts, so it overstates active skill.
 - **Transparent ranking.** Strategies are ranked by on-chain per-interval alpha versus a hold
-  benchmark. AUM and volume never feed the ranking.
+  benchmark, expressed as a dimensionless return. AUM and volume never feed the ranking.
 
 ## Layout
 
@@ -50,7 +51,7 @@ UNICHAIN_SEPOLIA_RPC_URL=<rpc> forge test --match-contract ForkLifecycleTest -vv
 
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — components and invariants
 - [`docs/THREAT_MODEL.md`](docs/THREAT_MODEL.md) — threats, vectors, mitigations
-- [`docs/KNOWN_LIMITATIONS.md`](docs/KNOWN_LIMITATIONS.md) — honest boundaries and open work
+- [`docs/KNOWN_LIMITATIONS.md`](docs/KNOWN_LIMITATIONS.md) — boundaries and open work
 - [`docs/CHANGELOG.md`](docs/CHANGELOG.md) — notable changes
 - [`docs/OPEN_QUESTIONS.md`](docs/OPEN_QUESTIONS.md) — unverified items
 - [`docs/FEEDBACK.md`](docs/FEEDBACK.md) — Uniswap v4 developer friction encountered while building

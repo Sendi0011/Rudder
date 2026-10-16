@@ -649,7 +649,7 @@ contract RudderVault is Initializable, ERC20, ReentrancyGuard, IUnlockCallback {
     /// @dev Move the per-account hold benchmark pro-rata with shares on transfer (never on mint or
     ///      burn, which the deposit/withdraw paths account for explicitly). Keeps every holder's
     ///      benchmark attached to the shares it was created for, so a buyer inherits the seller's
-    ///      cost basis and the performance fee stays honest across transfers and migrations.
+    ///      cost basis and the performance fee stays consistent across transfers and migrations.
     function _update(address from, address to, uint256 value) internal override {
         if (from != address(0) && to != address(0)) {
             uint256 fromBal = balanceOf(from);

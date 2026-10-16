@@ -32,9 +32,10 @@ Bounded-delegation hook plus vaults for curated liquidity on Uniswap v4.
 | 13 | Zero-operand division | `mulDiv` divides by zero when `a==0` | Explicit zero short-circuit; caught by fuzz | Fixed |
 | 14 | Malicious/unknown hook on a vault | Curator points a vault at an arbitrary hook | `VaultFactory` pins a single hook (bound once) and rejects any other; vault rejects uninitialized pools | Implemented + tested |
 
-## Known limitations (honest)
+## Known limitations
 See `KNOWN_LIMITATIONS.md` for the full, maintained list. In short: the hold benchmark is a
-deliberate lower bound, the NAV-loss bound is a rounding guard rather than drawdown protection, the
+deliberate lower bound that overstates active skill, the NAV-loss bound is a rounding guard rather
+than drawdown protection, the
 fork test and deploy broadcast have not been run against a live RPC, and there is no third-party
 audit.
 
