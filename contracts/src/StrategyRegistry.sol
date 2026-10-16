@@ -5,10 +5,12 @@ import {Envelope, EnvelopeLib} from "./libraries/EnvelopeLib.sol";
 
 /// @title StrategyRegistry
 /// @notice Registry for curator strategies with bounded envelopes and timelocked loosening.
-/// @dev    Ranking is alpha-vs-hold only (AUM and volume never feed it): the vault records its
-///         cumulative alpha-per-share on each LP action, and the score is the change over a rolling
-///         lookback window, so a strategy is ranked on per-interval performance rather than a
-///         since-inception total that stale history could inflate.
+/// @dev    Ranking is alpha-vs-hold only (AUM and volume never feed it): each vault reports its
+///         running alpha accumulator on every LP action, and the score is that accumulator minus the
+///         oldest sample still inside the lookback window, so a strategy is ranked on per-interval
+///         performance rather than a since-inception total that stale history could inflate. Samples
+///         are persisted at most once per `CHECKPOINT_INTERVAL` into a fixed-capacity ring, so the
+///         history can never grow unbounded no matter how often a vault acts.
 contract StrategyRegistry {
     error Unauthorized();
     error TimelockNotReady();
@@ -16,6 +18,15 @@ contract StrategyRegistry {
     error FactoryAlreadySet();
     error StrategyAlreadyBound();
     error UnknownStrategy();
+
+    uint256 public constant LOOSEN_DELAY = 24 hours;
+    /// @notice Rolling window over which per-interval alpha is measured.
+    uint32 public constant ALPHA_LOOKBACK = 30 days;
+    /// @notice Minimum time between persisted alpha samples. `MAX_CHECKPOINTS * CHECKPOINT_INTERVAL`
+    ///         spans the lookback, so the fixed ring always covers the whole window.
+    uint32 public constant CHECKPOINT_INTERVAL = 1 hours;
+    /// @notice Fixed number of alpha samples retained per strategy (ring buffer, oldest overwritten).
+    uint256 public constant MAX_CHECKPOINTS = 720;
 
     struct Strategy {
         address curator;
@@ -28,20 +39,26 @@ contract StrategyRegistry {
         uint256 unlockTime;
     }
 
-    /// @dev A recorded (timestamp, cumulative alpha-per-share) sample. Score = newest minus the
-    ///      oldest sample still inside the lookback window.
+    /// @dev A recorded (timestamp, cumulative alpha) sample. The score is the vault's live
+    ///      accumulator minus the oldest sample still inside the lookback window.
     struct Checkpoint {
         uint64 ts;
-        int256 alphaPerShare;
+        int256 cumulativeAlpha;
     }
 
-    uint256 public constant LOOSEN_DELAY = 24 hours;
-    /// @notice Rolling window over which per-interval alpha is measured.
-    uint32 public constant ALPHA_LOOKBACK = 30 days;
+    /// @dev Fixed-capacity ring of checkpoints. `head` is the next write slot; once `count` reaches
+    ///      `MAX_CHECKPOINTS` the oldest sample is overwritten, so the history is hard-bounded.
+    struct AlphaHistory {
+        Checkpoint[MAX_CHECKPOINTS] samples;
+        uint256 head;
+        uint256 count;
+    }
 
     mapping(uint256 => Strategy) public strategies;
     mapping(uint256 => PendingEnvelope) public pendingEnvelope;
-    mapping(uint256 => Checkpoint[]) internal _alphaHistory;
+    /// @notice Latest cumulative alpha reported by each strategy's vault (updated on every action).
+    mapping(uint256 => int256) public alphaAccumulator;
+    mapping(uint256 => AlphaHistory) internal _alphaHistory;
     mapping(uint256 => address) public strategyVault;
     uint256 public nextStrategyId;
 
@@ -54,7 +71,7 @@ contract StrategyRegistry {
     event EnvelopeTightened(uint256 indexed id);
     event EnvelopeLooseningQueued(uint256 indexed id, uint256 unlockTime);
     event EnvelopeLooseningApplied(uint256 indexed id);
-    event AlphaCheckpointed(uint256 indexed id, int256 alphaPerShare);
+    event AlphaCheckpointed(uint256 indexed id, int256 cumulativeAlpha);
     event FactorySet(address indexed factory);
     event StrategyVaultBound(uint256 indexed id, address indexed vault);
 
@@ -128,27 +145,45 @@ contract StrategyRegistry {
         emit StrategyVaultBound(id, vault);
     }
 
-    /// @notice Record the vault's current cumulative alpha-per-share. Only the bound vault may call.
-    function checkpointAlpha(uint256 id, int256 alphaPerShare) external {
+    /// @notice Record the vault's running alpha accumulator. Only the bound vault may call. The live
+    ///         accumulator is updated on every call, but a durable sample is appended at most once
+    ///         per `CHECKPOINT_INTERVAL`, so a vault acting on every block cannot grow the ring.
+    function checkpointAlpha(uint256 id, int256 cumulativeAlpha) external {
         if (strategyVault[id] != msg.sender) revert Unauthorized();
-        _alphaHistory[id].push(Checkpoint({ts: uint64(block.timestamp), alphaPerShare: alphaPerShare}));
-        _prune(id);
-        emit AlphaCheckpointed(id, alphaPerShare);
+        alphaAccumulator[id] = cumulativeAlpha;
+        AlphaHistory storage h = _alphaHistory[id];
+        if (h.count == 0 || block.timestamp - _newestTs(h) >= CHECKPOINT_INTERVAL) {
+            h.samples[h.head] = Checkpoint({ts: uint64(block.timestamp), cumulativeAlpha: cumulativeAlpha});
+            h.head = h.head + 1 == MAX_CHECKPOINTS ? 0 : h.head + 1;
+            if (h.count < MAX_CHECKPOINTS) h.count += 1;
+        }
+        emit AlphaCheckpointed(id, cumulativeAlpha);
     }
 
-    /// @notice Time-weighted per-interval alpha over the lookback window: the change in cumulative
-    ///         alpha-per-share between the newest sample and the oldest sample still in the window.
-    ///         Zero when a strategy has fewer than two samples in the window.
+    /// @notice Per-interval alpha over the lookback window: the vault's live accumulator minus the
+    ///         oldest sample still inside the window. The anchor is the newest sample when every
+    ///         retained sample predates the window (a dormant strategy), which yields zero.
     function getAlpha(uint256 id) public view returns (int256) {
-        Checkpoint[] storage h = _alphaHistory[id];
-        uint256 len = h.length;
-        if (len < 2) return 0;
-        return h[len - 1].alphaPerShare - h[0].alphaPerShare;
+        AlphaHistory storage h = _alphaHistory[id];
+        uint256 n = h.count;
+        if (n == 0) return 0;
+        uint256 cutoff = block.timestamp > ALPHA_LOOKBACK ? block.timestamp - ALPHA_LOOKBACK : 0;
+        uint256 oldest = _oldestIndex(h);
+        uint256 anchor = _newestIndex(h);
+        for (uint256 i = 0; i < n; i++) {
+            uint256 idx = oldest + i;
+            if (idx >= MAX_CHECKPOINTS) idx -= MAX_CHECKPOINTS;
+            if (h.samples[idx].ts >= cutoff) {
+                anchor = idx;
+                break;
+            }
+        }
+        return alphaAccumulator[id] - h.samples[anchor].cumulativeAlpha;
     }
 
-    /// @notice Number of samples currently retained for a strategy (bounded by the lookback).
+    /// @notice Number of samples currently retained for a strategy (hard-bounded by `MAX_CHECKPOINTS`).
     function alphaSamples(uint256 id) external view returns (uint256) {
-        return _alphaHistory[id].length;
+        return _alphaHistory[id].count;
     }
 
     /// @notice Top `limit` active strategies by per-interval alpha, descending. Ties keep id order.
@@ -188,20 +223,19 @@ contract StrategyRegistry {
         }
     }
 
-    /// @dev Drop samples older than the lookback, keeping the newest sample before the cutoff as the
-    ///      window anchor so the score still spans the full lookback.
-    function _prune(uint256 id) internal {
-        Checkpoint[] storage h = _alphaHistory[id];
-        uint64 cutoff = block.timestamp > ALPHA_LOOKBACK ? uint64(block.timestamp - ALPHA_LOOKBACK) : 0;
-        if (cutoff == 0) return;
-        uint256 drop;
-        while (drop + 1 < h.length && h[drop + 1].ts <= cutoff) drop++;
-        if (drop == 0) return;
-        for (uint256 i = drop; i < h.length; i++) {
-            h[i - drop] = h[i];
-        }
-        for (uint256 j = 0; j < drop; j++) {
-            h.pop();
-        }
+    /// @dev Index of the oldest valid sample. While the ring is not yet full, samples occupy
+    ///      `samples[0..count-1]`; once full, `head` points at the oldest (next write) slot.
+    function _oldestIndex(AlphaHistory storage h) internal view returns (uint256) {
+        return h.count < MAX_CHECKPOINTS ? 0 : h.head;
+    }
+
+    /// @dev Index of the newest valid sample. Only meaningful when `count > 0`.
+    function _newestIndex(AlphaHistory storage h) internal view returns (uint256 idx) {
+        idx = _oldestIndex(h) + h.count - 1;
+        if (idx >= MAX_CHECKPOINTS) idx -= MAX_CHECKPOINTS;
+    }
+
+    function _newestTs(AlphaHistory storage h) internal view returns (uint64) {
+        return h.samples[_newestIndex(h)].ts;
     }
 }

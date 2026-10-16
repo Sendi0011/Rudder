@@ -28,7 +28,7 @@ interface IRudderHook {
 interface IStrategyRegistry {
     function getEnvelope(uint256 id) external view returns (Envelope memory);
     function isCurator(uint256 id, address who) external view returns (bool);
-    function checkpointAlpha(uint256 id, int256 alphaDelta) external;
+    function checkpointAlpha(uint256 id, int256 cumulativeAlpha) external;
 }
 
 /// @title RudderVault
@@ -522,9 +522,11 @@ contract RudderVault is Initializable, ERC20, ReentrancyGuard, IUnlockCallback {
         return int256(_mulDiv(nav, 1e18, supply)) - int256(_mulDiv(holdValue, 1e18, supply));
     }
 
-    /// @dev Records the change in alpha-vs-hold to the registry. Runs automatically on every
+    /// @dev Records the vault's cumulative alpha-vs-hold to the registry. Runs automatically on every
     ///      deposit/withdraw/rebalance (never curator-triggered). Skipped while the oracle is not
-    ///      ready, since a checkpoint requires a trustworthy TWAP.
+    ///      ready, since a checkpoint requires a trustworthy TWAP. The registry call is best-effort:
+    ///      a revert there must never block an LP action (a withdrawal in particular) — it is retried
+    ///      on the next action.
     function _checkpointAlpha() internal {
         if (!IRudderHook(hook).isOracleReady(poolKey)) return;
         uint256 supply = totalSupply();
@@ -533,9 +535,10 @@ contract RudderVault is Initializable, ERC20, ReentrancyGuard, IUnlockCallback {
         uint256 nav = _totalAssetsValue();
         uint256 holdValue = LiquidityLib.valueInToken0(totalHold.amount0, totalHold.amount1, sqrtP);
         int256 alpha = int256(_mulDiv(nav, 1e18, supply)) - int256(_mulDiv(holdValue, 1e18, supply));
-        // Report the cumulative level; the registry converts a level series into a per-interval score.
-        IStrategyRegistry(registry).checkpointAlpha(strategyId, alpha);
-        lastAlpha = alpha;
+        // Report the cumulative level; the registry turns a level series into a per-interval score.
+        try IStrategyRegistry(registry).checkpointAlpha(strategyId, alpha) {
+            lastAlpha = alpha;
+        } catch {}
     }
 
     function _performanceFee(Basket memory hb, uint256 total0, uint256 total1)

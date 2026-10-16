@@ -289,27 +289,27 @@ contract LifecycleTest is RudderIntegrationBase {
         assertEq(h1, BIG, "hold basket tracks token1");
     }
 
-    /// @notice Each LP action records a checkpoint; a donation raises NAV above the hold basket, so
-    ///         the per-interval score (newest sample minus the window anchor) must increase.
+    /// @notice Each LP action reports its cumulative alpha to the registry; a donation raises NAV
+    ///         above the hold basket, so the reported level must rise on the next action.
     function test_AlphaCheckpointedOnDeposit() public {
         _oracleReadyPool(); // makes TWAP trustworthy via swaps
         _fund(bob, BIG, BIG);
         _deposit(bob, BIG, BIG);
-        uint256 samplesBefore = registry.alphaSamples(strategyId);
+        int256 accBefore = registry.alphaAccumulator(strategyId);
 
         // Donation inflates NAV relative to the hold benchmark.
         token0.mint(address(vault), 100e18);
         _fund(alice, BIG, BIG);
         _deposit(alice, BIG, BIG);
-        assertGt(registry.alphaSamples(strategyId), samplesBefore, "deposit must checkpoint");
+        assertGt(registry.alphaAccumulator(strategyId), accBefore, "deposit must report alpha");
     }
 
-    /// @notice A withdrawal also records a checkpoint.
+    /// @notice A withdrawal also reports its cumulative alpha.
     function test_AlphaCheckpointedOnWithdraw() public {
         _oracleReadyPool();
         _fund(bob, BIG, BIG);
         _deposit(bob, BIG, BIG); // baseline checkpoint
-        uint256 samplesBefore = registry.alphaSamples(strategyId);
+        int256 accBefore = registry.alphaAccumulator(strategyId);
 
         uint256 shares = vault.balanceOf(alice);
         assertGt(shares, 0);
@@ -317,21 +317,44 @@ contract LifecycleTest is RudderIntegrationBase {
         vm.prank(alice);
         vault.withdraw(shares / 2, alice);
 
-        assertGt(registry.alphaSamples(strategyId), samplesBefore, "withdraw must checkpoint");
+        assertGt(registry.alphaAccumulator(strategyId), accBefore, "withdraw must report alpha");
     }
 
-    /// @notice A rebalance records a checkpoint too.
+    /// @notice A rebalance reports cumulative alpha too.
     function test_AlphaCheckpointedOnRebalance() public {
         _oracleReadyPool();
         _fund(bob, BIG, BIG);
         _deposit(bob, BIG, BIG); // baseline checkpoint
-        uint256 samplesBefore = registry.alphaSamples(strategyId);
+        int256 accBefore = registry.alphaAccumulator(strategyId);
 
         token0.mint(address(vault), 100e18);
         vm.prank(curator);
         vault.rebalance(-300, 300);
 
-        assertGt(registry.alphaSamples(strategyId), samplesBefore, "rebalance must checkpoint");
+        assertGt(registry.alphaAccumulator(strategyId), accBefore, "rebalance must report alpha");
+    }
+
+    /// @notice A long alpha history is hard-bounded by the registry ring buffer, and an LP can still
+    ///         exit afterwards: the checkpoint call is O(1) and never blocks a withdrawal.
+    function test_WithdrawSucceedsWithLongAlphaHistory() public {
+        _oracleReadyPool();
+        _fund(bob, BIG, BIG);
+        _deposit(bob, BIG, BIG);
+
+        // Fill the registry's fixed ring directly from the vault's own address.
+        uint256 cap = registry.MAX_CHECKPOINTS();
+        for (uint256 i = 0; i < cap + 10; i++) {
+            vm.warp(block.timestamp + 1 hours);
+            vm.prank(address(vault));
+            registry.checkpointAlpha(strategyId, int256(i));
+        }
+        assertEq(registry.alphaSamples(strategyId), cap, "history must stay bounded");
+
+        uint256 shares = vault.balanceOf(alice);
+        assertGt(shares, 0);
+        vm.prank(alice);
+        (uint256 out0, uint256 out1) = vault.withdraw(shares, alice);
+        assertGt(out0 + out1, 0, "withdraw must succeed with a long alpha history");
     }
 
     // ------------------------------------------------------------------

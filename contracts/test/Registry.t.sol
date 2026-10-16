@@ -138,7 +138,7 @@ contract RegistryTest is Test {
         assertEq(registry.getAlpha(id), 0);
     }
 
-    function test_AlphaHistoryPrunedToLookback() public {
+    function test_AlphaAnchorIsOldestSampleInWindow() public {
         vm.prank(curator);
         uint256 id = registry.registerStrategy(_env());
         registry.setFactory(factory);
@@ -146,17 +146,36 @@ contract RegistryTest is Test {
         registry.setStrategyVault(id, vault);
         vm.prank(vault);
         registry.checkpointAlpha(id, 0);
-        vm.warp(block.timestamp + 5 days);
-        vm.prank(vault);
-        registry.checkpointAlpha(id, 10);
         vm.warp(block.timestamp + 40 days);
+        vm.prank(vault);
+        registry.checkpointAlpha(id, 60);
+        vm.warp(block.timestamp + 5 days);
         vm.prank(vault);
         registry.checkpointAlpha(id, 100);
 
-        // Both older samples fall outside the 30-day window; pruning keeps only the newest sample
-        // before the cutoff as the anchor plus the fresh one.
-        assertEq(registry.alphaSamples(id), 2);
-        assertEq(registry.getAlpha(id), 90);
+        // All three samples are retained, but the first (40 days back) is outside the 30-day window,
+        // so the second anchors the score: live accumulator (100) - anchor (60) == 40.
+        assertEq(registry.alphaSamples(id), 3);
+        assertEq(registry.getAlpha(id), 40);
+    }
+
+    function test_AlphaHistoryBoundedByRingBuffer() public {
+        vm.prank(curator);
+        uint256 id = registry.registerStrategy(_env());
+        registry.setFactory(factory);
+        vm.prank(factory);
+        registry.setStrategyVault(id, vault);
+
+        uint256 cap = registry.MAX_CHECKPOINTS();
+        for (uint256 i = 0; i < cap + 25; i++) {
+            vm.warp(block.timestamp + 1 hours);
+            vm.prank(vault);
+            registry.checkpointAlpha(id, int256(i));
+        }
+
+        // The ring keeps only the newest `cap` samples; the 25 oldest are overwritten.
+        assertEq(registry.alphaSamples(id), cap, "history must be bounded by the ring");
+        assertEq(registry.getAlpha(id), int256(cap + 24) - int256(25));
     }
 
     function test_Leaderboard_OrdersByIntervalAlpha() public {
