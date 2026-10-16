@@ -143,7 +143,7 @@ abstract contract RudderIntegrationBase is Test {
     function _deployMinedHook(IPoolManager _manager, address _owner) internal returns (RudderHook deployed) {
         bytes memory args = abi.encode(_manager, _owner);
         bytes memory bytecode = abi.encodePacked(type(RudderHook).creationCode, args);
-        uint160 requiredFlags = uint160(Hooks.BEFORE_ADD_LIQUIDITY_FLAG | Hooks.AFTER_SWAP_FLAG);
+        uint160 requiredFlags = uint160(Hooks.BEFORE_ADD_LIQUIDITY_FLAG | Hooks.BEFORE_SWAP_FLAG);
         uint160 flagMask = uint160(0x3FFF);
         bytes32 salt;
         address predicted;

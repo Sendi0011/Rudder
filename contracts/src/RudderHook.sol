@@ -17,6 +17,10 @@ interface IVaultFactory {
 }
 
 /// @title RudderHook
+/// @notice Gates vault liquidity and maintains a manipulation-resistant TWAP. Prices are sampled in
+///         `beforeSwap` (the pre-swap price), so a swap can never choose the price it is recorded at;
+///         intra-block pushes are collapsed to a single sample per timestamp so a same-block
+///         push-and-reverse cannot move the oracle.
 contract RudderHook is IHooks, ReentrancyGuard {
     using PoolIdLibrary for PoolKey;
     using StateLibrary for IPoolManager;
@@ -26,17 +30,27 @@ contract RudderHook is IHooks, ReentrancyGuard {
     error Unauthorized();
     error FactoryAlreadySet();
 
+    uint16 public constant CAPACITY = 2048;
+    uint256 public constant MIN_OBSERVATIONS = 2;
+
     struct Observation {
         uint32 timestamp;
         uint160 sqrtPriceX96;
     }
 
-    uint256 public constant MIN_OBSERVATIONS = 2;
+    /// @dev Fixed-capacity ring buffer per pool. Storage is only paid for the slots actually written.
+    struct Oracle {
+        Observation[CAPACITY] buf;
+        uint16 next;
+        uint16 count;
+    }
+
     uint256 public constant MAX_OBSERVATION_AGE = 1 hours;
 
-    mapping(PoolId => Observation[]) internal _observations;
+    mapping(PoolId => Oracle) internal _oracle;
 
     IPoolManager public immutable poolManager;
+    /// @notice The factory whose vaults are allowed to add liquidity. Set exactly once by `owner`.
     address public vaultFactory;
     address public owner;
     bool public paused;
@@ -53,15 +67,16 @@ contract RudderHook is IHooks, ReentrancyGuard {
         _;
     }
 
-    /// @notice Pause/unpause deposit and rebalance. Withdrawals are never gated by `paused`.
-    function setPaused(bool _paused) external onlyOwner {
-        paused = _paused;
-    }
-
-    /// @notice Bind the single vault factory allowed to add liquidity. Callable once.
+    /// @notice Bind the vault factory. Callable once by the owner; keeps the hook's factory link
+    ///         from being front-run or replaced.
     function setVaultFactory(address _factory) external onlyOwner {
         if (vaultFactory != address(0)) revert FactoryAlreadySet();
         vaultFactory = _factory;
+    }
+
+    /// @notice Pause/unpause deposit and rebalance. Withdrawals are never gated by `paused`.
+    function setPaused(bool _paused) external onlyOwner {
+        paused = _paused;
     }
 
     modifier onlyPoolManager() {
@@ -69,48 +84,96 @@ contract RudderHook is IHooks, ReentrancyGuard {
         _;
     }
 
+    // ---------------------------------------------------------------------
+    // Oracle
+    // ---------------------------------------------------------------------
+
     function isOracleReady(PoolKey calldata key) public view returns (bool) {
-        PoolId id = key.toId();
-        Observation[] storage obs = _observations[id];
-        if (obs.length < MIN_OBSERVATIONS) return false;
-        Observation storage last = obs[obs.length - 1];
+        Oracle storage o = _oracle[key.toId()];
+        if (o.count < MIN_OBSERVATIONS) return false;
+        Observation storage last = _newest(o);
         if (block.timestamp - last.timestamp > MAX_OBSERVATION_AGE) return false;
         return true;
     }
 
     function getLastObservation(PoolKey calldata key) external view returns (uint32 ts, uint160 sqrtPriceX96) {
-        PoolId id = key.toId();
-        Observation[] storage obs = _observations[id];
-        if (obs.length == 0) return (0, 0);
-        Observation storage last = obs[obs.length - 1];
+        Oracle storage o = _oracle[key.toId()];
+        if (o.count == 0) return (0, 0);
+        Observation storage last = _newest(o);
         return (last.timestamp, last.sqrtPriceX96);
     }
 
-    /// @notice Time-weighted average sqrtPriceX96 over the last `secondsAgo`, built from the
-    ///         afterSwap observation ring buffer. Values each stored sample by the duration it
-    ///         was the last observed price. Reverts nothing; returns the latest sample if the
-    ///         window contains no observations.
+    /// @notice Number of samples currently held for a pool.
+    function observationCount(PoolKey calldata key) external view returns (uint256) {
+        return _oracle[key.toId()].count;
+    }
+
+    /// @notice Time-weighted average sqrtPriceX96 over the last `secondsAgo`. Each sample's price is
+    ///         credited for the time until the next sample (or until now for the newest), clamped to
+    ///         the window. Returns the newest sample if the window holds no interval.
     function consult(PoolKey calldata key, uint32 secondsAgo) external view returns (uint160 sqrtPriceX96) {
-        Observation[] storage obs = _observations[key.toId()];
-        uint256 n = obs.length;
-        if (n == 0) return 0;
+        Oracle storage o = _oracle[key.toId()];
+        uint16 count = o.count;
+        if (count == 0) return 0;
 
         uint256 windowStart = block.timestamp > secondsAgo ? block.timestamp - secondsAgo : 0;
-        uint256 prevTs = block.timestamp;
-        uint256 sumDt;
+        uint16 oldest = _oldestIndex(o);
         uint256 sumWeighted;
-        // Walk backwards from newest until we pass the start of the window.
-        for (uint256 i = n; i > 0; i--) {
-            Observation storage o = obs[i - 1];
-            if (o.timestamp <= windowStart) break;
-            uint256 dt = prevTs - o.timestamp;
-            sumWeighted += uint256(o.sqrtPriceX96) * dt;
+        uint256 sumDt;
+
+        for (uint16 k = 0; k < count; k++) {
+            uint16 idx = oldest + k;
+            if (idx >= CAPACITY) idx -= CAPACITY;
+
+            uint256 tEnd;
+            if (k + 1 < count) {
+                uint16 nidx = idx + 1;
+                if (nidx >= CAPACITY) nidx -= CAPACITY;
+                tEnd = o.buf[nidx].timestamp;
+            } else {
+                tEnd = block.timestamp;
+            }
+            if (tEnd <= windowStart) continue;
+
+            uint256 tStart = o.buf[idx].timestamp > windowStart ? o.buf[idx].timestamp : windowStart;
+            if (tEnd <= tStart) continue;
+
+            uint256 dt = tEnd - tStart;
+            sumWeighted += uint256(o.buf[idx].sqrtPriceX96) * dt;
             sumDt += dt;
-            prevTs = o.timestamp;
         }
-        if (sumDt == 0) return obs[n - 1].sqrtPriceX96;
+
+        if (sumDt == 0) return _newest(o).sqrtPriceX96;
         return uint160(sumWeighted / sumDt);
     }
+
+    function _record(PoolKey calldata key) internal {
+        PoolId id = key.toId();
+        Oracle storage o = _oracle[id];
+
+        // One sample per timestamp: the first swap of a block fixes the sample at the honest
+        // pre-swap price, and any later swap in the same block cannot overwrite it.
+        if (o.count > 0 && _newest(o).timestamp == uint32(block.timestamp)) return;
+
+        (uint160 sqrtPriceX96,,,) = poolManager.getSlot0(id);
+        o.buf[o.next] = Observation({timestamp: uint32(block.timestamp), sqrtPriceX96: sqrtPriceX96});
+        o.next = o.next + 1 == CAPACITY ? 0 : o.next + 1;
+        if (o.count < CAPACITY) o.count += 1;
+    }
+
+    function _newest(Oracle storage o) internal view returns (Observation storage) {
+        uint16 idx = o.next == 0 ? CAPACITY - 1 : o.next - 1;
+        return o.buf[idx];
+    }
+
+    function _oldestIndex(Oracle storage o) internal view returns (uint16) {
+        if (o.count < CAPACITY) return 0;
+        return o.next;
+    }
+
+    // ---------------------------------------------------------------------
+    // Hook permissions and callbacks
+    // ---------------------------------------------------------------------
 
     function getHookPermissions() public pure returns (Hooks.Permissions memory) {
         return Hooks.Permissions({
@@ -120,8 +183,8 @@ contract RudderHook is IHooks, ReentrancyGuard {
             beforeRemoveLiquidity: false,
             afterAddLiquidity: false,
             afterRemoveLiquidity: false,
-            beforeSwap: false,
-            afterSwap: true,
+            beforeSwap: true,
+            afterSwap: false,
             beforeDonate: false,
             afterDonate: false,
             beforeSwapReturnDelta: false,
@@ -179,33 +242,22 @@ contract RudderHook is IHooks, ReentrancyGuard {
         return (IHooks.afterRemoveLiquidity.selector, BalanceDelta.wrap(0));
     }
 
-    function beforeSwap(address, PoolKey calldata, SwapParams calldata, bytes calldata)
+    /// @dev Records the pre-swap price. Runs before the swap executes, so the sample is the price
+    ///      that was already in force, never one the caller produced.
+    function beforeSwap(address, PoolKey calldata key, SwapParams calldata, bytes calldata)
         external
-        pure
+        onlyPoolManager
         returns (bytes4, BeforeSwapDelta, uint24)
     {
+        _record(key);
         return (IHooks.beforeSwap.selector, BeforeSwapDelta.wrap(0), 0);
     }
 
-    function afterSwap(address, PoolKey calldata key, SwapParams calldata, BalanceDelta, bytes calldata)
+    function afterSwap(address, PoolKey calldata, SwapParams calldata, BalanceDelta, bytes calldata)
         external
-        onlyPoolManager
+        pure
         returns (bytes4, int128)
     {
-        PoolId id = key.toId();
-        (uint160 sqrtPriceX96,,,) = poolManager.getSlot0(id);
-        Observation[] storage obs = _observations[id];
-        if (obs.length == 0 || (block.timestamp != obs[obs.length - 1].timestamp)) {
-            obs.push(Observation({timestamp: uint32(block.timestamp), sqrtPriceX96: sqrtPriceX96}));
-            if (obs.length > 1440) {
-                for (uint256 i = 0; i < 720; i++) {
-                    obs[i] = obs[i + 720];
-                }
-                assembly {
-                    sstore(obs.slot, sub(mload(obs.slot), 720))
-                }
-            }
-        }
         return (IHooks.afterSwap.selector, 0);
     }
 

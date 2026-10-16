@@ -48,7 +48,7 @@ contract Deploy is Script {
         RudderVault implementation = new RudderVault();
 
         // Permission bits == the bits getHookPermissions() sets to true in RudderHook.
-        uint160 flags = uint160(Hooks.BEFORE_ADD_LIQUIDITY_FLAG | Hooks.AFTER_SWAP_FLAG);
+        uint160 flags = uint160(Hooks.BEFORE_ADD_LIQUIDITY_FLAG | Hooks.BEFORE_SWAP_FLAG);
         (address expectedHook, bytes32 salt) = _mineHook(flags, abi.encode(IPoolManager(d.poolManager), owner));
 
         RudderHook hook = new RudderHook{salt: salt}(IPoolManager(d.poolManager), owner);

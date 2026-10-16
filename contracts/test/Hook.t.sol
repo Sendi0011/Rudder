@@ -41,7 +41,7 @@ contract HookTest is Test {
     {
         code = _initCode(manager, _owner);
         bytes32 codeHash = keccak256(code);
-        uint160 flags = uint160(Hooks.BEFORE_ADD_LIQUIDITY_FLAG | Hooks.AFTER_SWAP_FLAG);
+        uint160 flags = uint160(Hooks.BEFORE_ADD_LIQUIDITY_FLAG | Hooks.BEFORE_SWAP_FLAG);
         uint160 mask = uint160(0x3FFF);
         for (uint256 i = 0; i < 500_000; i++) {
             address candidate = address(
@@ -58,7 +58,7 @@ contract HookTest is Test {
     function _deployHook(IPoolManager manager, address _owner) internal returns (RudderHook deployed) {
         bytes memory code = _initCode(manager, _owner);
         bytes32 codeHash = keccak256(code);
-        uint160 flags = uint160(Hooks.BEFORE_ADD_LIQUIDITY_FLAG | Hooks.AFTER_SWAP_FLAG);
+        uint160 flags = uint160(Hooks.BEFORE_ADD_LIQUIDITY_FLAG | Hooks.BEFORE_SWAP_FLAG);
         uint160 mask = uint160(0x3FFF);
         bytes32 salt;
         address predicted;
