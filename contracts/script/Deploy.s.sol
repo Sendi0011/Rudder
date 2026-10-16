@@ -40,20 +40,23 @@ contract Deploy is Script {
     function run() external returns (Deployment memory d) {
         d.poolManager = vm.envOr("POOL_MANAGER", UNICHAIN_SEPOLIA_POOL_MANAGER);
 
+        address owner = msg.sender;
+
         vm.startBroadcast();
 
         StrategyRegistry registry = new StrategyRegistry();
         RudderVault implementation = new RudderVault();
-        VaultFactory factory = new VaultFactory(address(implementation), IPoolManager(d.poolManager), address(registry));
 
         // Permission bits == the bits getHookPermissions() sets to true in RudderHook.
         uint160 flags = uint160(Hooks.BEFORE_ADD_LIQUIDITY_FLAG | Hooks.AFTER_SWAP_FLAG);
-        (address expectedHook, bytes32 salt) =
-            _mineHook(flags, abi.encode(IPoolManager(d.poolManager), address(factory)));
+        (address expectedHook, bytes32 salt) = _mineHook(flags, abi.encode(IPoolManager(d.poolManager), owner));
 
-        RudderHook hook = new RudderHook{salt: salt}(IPoolManager(d.poolManager), address(factory));
+        RudderHook hook = new RudderHook{salt: salt}(IPoolManager(d.poolManager), owner);
         if (address(hook) != expectedHook) revert HookAddressMismatch(expectedHook, address(hook));
 
+        VaultFactory factory = new VaultFactory(address(implementation), IPoolManager(d.poolManager), address(registry));
+
+        hook.setVaultFactory(address(factory));
         // One-time owner call to authorize the factory to bind vaults to strategies.
         registry.setFactory(address(factory));
 

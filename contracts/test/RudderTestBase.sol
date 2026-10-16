@@ -23,20 +23,22 @@ abstract contract RudderTestBase is Test {
     RudderHook internal hook;
 
     address internal manager = address(0x1111);
+    address internal owner = address(this);
     address internal curator = address(0xC0FFEE);
 
     function setUp() public virtual {
         registry = new StrategyRegistry();
         vaultImpl = new RudderVault();
         factory = new VaultFactory(address(vaultImpl), IPoolManager(manager), address(registry));
+        hook = _deployMinedHook(manager, owner);
+        hook.setVaultFactory(address(factory));
         registry.setFactory(address(factory));
-        hook = _deployMinedHook(manager, address(factory));
     }
 
     /// @dev Mines a salt so the hook lands at an address whose low 14 bits exactly match the
     ///      permissions declared in RudderHook.getHookPermissions (beforeAddLiquidity + afterSwap).
-    function _deployMinedHook(address _manager, address _factory) internal returns (RudderHook deployed) {
-        bytes memory args = abi.encode(IPoolManager(_manager), _factory);
+    function _deployMinedHook(address _manager, address _owner) internal returns (RudderHook deployed) {
+        bytes memory args = abi.encode(IPoolManager(_manager), _owner);
         bytes memory bytecode = abi.encodePacked(type(RudderHook).creationCode, args);
         uint160 requiredFlags = uint160(Hooks.BEFORE_ADD_LIQUIDITY_FLAG | Hooks.AFTER_SWAP_FLAG);
         uint160 flagMask = uint160(0x3FFF);
@@ -48,7 +50,7 @@ abstract contract RudderTestBase is Test {
             predicted = vm.computeCreate2Address(salt, keccak256(bytecode), address(this));
             if ((uint160(predicted) & flagMask) == requiredFlags) break;
         }
-        deployed = new RudderHook{salt: salt}(IPoolManager(_manager), _factory);
+        deployed = new RudderHook{salt: salt}(IPoolManager(_manager), _owner);
         require(address(deployed) == predicted, "hook mine failed");
     }
 

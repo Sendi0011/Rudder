@@ -24,6 +24,7 @@ contract RudderHook is IHooks, ReentrancyGuard {
     error OnlyVault();
     error Paused();
     error Unauthorized();
+    error FactoryAlreadySet();
 
     struct Observation {
         uint32 timestamp;
@@ -36,14 +37,14 @@ contract RudderHook is IHooks, ReentrancyGuard {
     mapping(PoolId => Observation[]) internal _observations;
 
     IPoolManager public immutable poolManager;
-    address public immutable vaultFactory;
+    address public vaultFactory;
     address public owner;
     bool public paused;
 
-    constructor(IPoolManager _manager, address _vaultFactory) {
+    constructor(IPoolManager _manager, address _owner) {
+        if (_owner == address(0)) revert Unauthorized();
         poolManager = _manager;
-        vaultFactory = _vaultFactory;
-        owner = msg.sender;
+        owner = _owner;
         Hooks.validateHookPermissions(this, getHookPermissions());
     }
 
@@ -57,8 +58,14 @@ contract RudderHook is IHooks, ReentrancyGuard {
         paused = _paused;
     }
 
+    /// @notice Bind the single vault factory allowed to add liquidity. Callable once.
+    function setVaultFactory(address _factory) external onlyOwner {
+        if (vaultFactory != address(0)) revert FactoryAlreadySet();
+        vaultFactory = _factory;
+    }
+
     modifier onlyPoolManager() {
-        if (msg.sender != address(poolManager)) revert();
+        if (msg.sender != address(poolManager)) revert Unauthorized();
         _;
     }
 

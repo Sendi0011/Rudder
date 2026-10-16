@@ -61,10 +61,11 @@ contract ForkLifecycleTest is Test {
         factory = new VaultFactory(address(implementation), manager, address(registry));
 
         uint160 flags = uint160(Hooks.BEFORE_ADD_LIQUIDITY_FLAG | Hooks.AFTER_SWAP_FLAG);
-        (address expectedHook, bytes32 salt) = _mineHook(flags, abi.encode(manager, address(factory)));
-        hook = new RudderHook{salt: salt}(manager, address(factory));
+        (address expectedHook, bytes32 salt) = _mineHook(flags, abi.encode(manager, address(this)));
+        hook = new RudderHook{salt: salt}(manager, address(this));
         assertEq(address(hook), expectedHook, "mined hook address mismatched at deploy");
 
+        hook.setVaultFactory(address(factory));
         registry.setFactory(address(factory));
 
         key = PoolKey({
