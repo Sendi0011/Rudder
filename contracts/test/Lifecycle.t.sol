@@ -357,6 +357,82 @@ contract LifecycleTest is RudderIntegrationBase {
         assertGt(out0 + out1, 0, "withdraw must succeed with a long alpha history");
     }
 
+    /// @notice Alpha is a dimensionless return, so two vaults running the same strategy on the same
+    ///         pool score identically no matter how much capital each one holds.
+    function test_AlphaIsSizeIndependent() public {
+        RudderVault v = _newVault(_envelope());
+        _bootstrap(vault, -600, 600);
+        _bootstrap(v, -600, 600);
+
+        // 100x different capital, identical range and strategy.
+        _fund(alice, BIG, BIG);
+        _deposit(alice, BIG, BIG);
+        _fund(bob, 200e18, 200e18);
+        vm.startPrank(bob);
+        IERC20(address(token0)).approve(address(v), type(uint256).max);
+        IERC20(address(token1)).approve(address(v), type(uint256).max);
+        vm.stopPrank();
+        vm.prank(bob);
+        v.deposit(100e18, 100e18, bob);
+
+        // Populate the shared oracle and flush any post-setup noise into each baseline.
+        _swap(true, -int256(1e18));
+        vm.warp(block.timestamp + 10);
+        _swap(true, -int256(1e18));
+        vm.warp(block.timestamp + 10);
+        _fund(alice, 1e18, 1e18);
+        _deposit(alice, 1e18, 1e18);
+        _fund(bob, 1e16, 1e16);
+        _approve(bob, address(v));
+        vm.prank(bob);
+        v.deposit(1e16, 1e16, bob);
+
+        // Proportionally equal donations, then one action per vault to accrue the interval. No swap
+        // sits in this interval, so each vault's delta is exactly the donation's return.
+        int256 bigBefore = vault.cumulativeAlpha();
+        int256 smallBefore = v.cumulativeAlpha();
+        token0.mint(address(vault), 100e18);
+        token0.mint(address(v), 1e18);
+        _fund(alice, 1e18, 1e18);
+        _deposit(alice, 1e18, 1e18);
+        _fund(bob, 1e16, 1e16);
+        _approve(bob, address(v));
+        vm.prank(bob);
+        v.deposit(1e16, 1e16, bob);
+
+        int256 bigDelta = vault.cumulativeAlpha() - bigBefore;
+        int256 smallDelta = v.cumulativeAlpha() - smallBefore;
+        assertGt(bigDelta, 0, "large vault must accrue the donation");
+        assertGt(smallDelta, 0, "small vault must accrue the donation");
+        assertApproxEqRel(bigDelta, smallDelta, 0.02e18, "score must not depend on vault size");
+    }
+
+    /// @notice A deposit or withdrawal inside the window must not move the score: the interval is
+    ///         accrued from the pre-action baseline and the baseline is rebased afterwards, so flows
+    ///         are never mistaken for performance.
+    function test_AlphaUnaffectedByMidWindowFlows() public {
+        _oracleReadyPool();
+        _fund(bob, 4 * BIG, 4 * BIG);
+        _deposit(bob, BIG, BIG);
+
+        // A donation lifts NAV per share; the next action accrues it as positive alpha.
+        int256 beforeDonation = vault.cumulativeAlpha();
+        token0.mint(address(vault), 100e18);
+        _deposit(bob, 1e18, 1e18);
+        int256 alphaAfterDonation = vault.cumulativeAlpha();
+        assertGt(alphaAfterDonation, beforeDonation, "donation must lift alpha");
+
+        // A large mid-window deposit at a flat price must leave the score untouched.
+        _deposit(bob, BIG, BIG);
+        assertEq(vault.cumulativeAlpha(), alphaAfterDonation, "deposit must not change the score");
+
+        // So must a mid-window withdrawal.
+        uint256 shares = vault.balanceOf(bob);
+        vm.prank(bob);
+        vault.withdraw(shares / 4, bob);
+        assertEq(vault.cumulativeAlpha(), alphaAfterDonation, "withdraw must not change the score");
+    }
+
     // ------------------------------------------------------------------
     // oracle bootstrap (one-time flag) and oracle-independent withdrawal
     // ------------------------------------------------------------------

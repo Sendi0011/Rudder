@@ -99,9 +99,18 @@ contract RudderVault is Initializable, ERC20, ReentrancyGuard, IUnlockCallback {
     ///         hold benchmark used for alpha checkpoints.
     Basket public totalHold;
 
-    /// @notice NAV-per-share minus hold-value-per-share at the last checkpoint, in token0 wei per 1e18
-    ///         shares. Used to emit deltas to the registry.
-    int256 public lastAlpha;
+    /// @notice Cumulative alpha reported to the registry: the running sum of per-interval
+    ///         `vaultReturn - holdReturn`, each a 1e18-scaled fraction. Dimensionless, so vaults of
+    ///         any size and token decimals are ranked on the same scale.
+    int256 public cumulativeAlpha;
+
+    /// @notice Baseline for the next interval, captured at TWAP after the last action: NAV per 1e18
+    ///         shares, the hold basket per 1e18 shares, and that basket's token0 value. Rebasing after
+    ///         every action keeps deposits and withdrawals out of the measured return.
+    uint256 public baseNavPerShare;
+    uint256 public baseHold0PerShare;
+    uint256 public baseHold1PerShare;
+    uint256 public baseHoldValuePerShare;
 
     /// @notice Curator fees accrued but not yet claimed (pull-based). Kept in-vault and excluded from
     ///         NAV, so a fee recipient that rejects transfers can never block a withdrawal.
@@ -216,6 +225,8 @@ contract RudderVault is Initializable, ERC20, ReentrancyGuard, IUnlockCallback {
         if (amount0 == 0 && amount1 == 0) revert ZeroAmount();
         if (recipient == address(0)) revert ZeroAmount();
 
+        _accrueAlphaInterval();
+
         // Reject deposits priced off a manipulated spot: once the TWAP is live, the spot must stay
         // within the envelope's deviation bound of it. Withdrawals are never gated by this.
         if (oracleBootstrapped) {
@@ -255,7 +266,7 @@ contract RudderVault is Initializable, ERC20, ReentrancyGuard, IUnlockCallback {
         hb.amount1 += amount1;
         totalHold.amount0 += amount0;
         totalHold.amount1 += amount1;
-        _checkpointAlpha();
+        _rebaseAlphaBaseline();
         emit Deposit(msg.sender, recipient, amount0, amount1, shares);
     }
 
@@ -269,6 +280,8 @@ contract RudderVault is Initializable, ERC20, ReentrancyGuard, IUnlockCallback {
         uint256 userShares = balanceOf(msg.sender);
         if (userShares < shares) revert InsufficientBalance();
         uint256 supply = totalSupply();
+
+        _accrueAlphaInterval();
 
         if (positionLiquidity > 0) _collect();
 
@@ -308,7 +321,7 @@ contract RudderVault is Initializable, ERC20, ReentrancyGuard, IUnlockCallback {
         pendingFees0 += fee0;
         pendingFees1 += fee1;
 
-        _checkpointAlpha();
+        _rebaseAlphaBaseline();
         emit Withdraw(msg.sender, recipient, shares, amount0Out, amount1Out, fee0, fee1);
     }
 
@@ -365,6 +378,8 @@ contract RudderVault is Initializable, ERC20, ReentrancyGuard, IUnlockCallback {
 
         EnvelopeLib.validatePriceImpact(_priceImpactBps(spot, twap), env.maxPriceImpactBps);
 
+        _accrueAlphaInterval();
+
         if (positionLiquidity > 0) _collect();
         uint256 preNav = _totalAssetsValue();
 
@@ -381,7 +396,7 @@ contract RudderVault is Initializable, ERC20, ReentrancyGuard, IUnlockCallback {
         EnvelopeLib.validateNavLoss(_navLossBps(preNav, postNav), env.maxNavLossBps);
 
         lastRebalanceTimestamp = uint48(block.timestamp);
-        _checkpointAlpha();
+        _rebaseAlphaBaseline();
         emit Rebalance(strategyId, newTickLower, newTickUpper, positionLiquidity);
     }
 
@@ -510,35 +525,48 @@ contract RudderVault is Initializable, ERC20, ReentrancyGuard, IUnlockCallback {
         return LiquidityLib.getAmountsForLiquidity(sqrtP, sqrtA, sqrtB, positionLiquidity);
     }
 
-    /// @notice Current alpha of the vault: NAV-per-share minus hold-value-per-share, both valued at
-    ///         TWAP and scaled to 1e18 shares. Positive means the vault beat its hold benchmark.
-    function alphaPerShare() external view returns (int256) {
-        if (!IRudderHook(hook).isOracleReady(poolKey)) return lastAlpha;
-        uint256 supply = totalSupply();
-        if (supply == 0) return 0;
-        uint160 sqrtP = _twapSqrtPrice();
-        uint256 nav = _totalAssetsValue();
-        uint256 holdValue = LiquidityLib.valueInToken0(totalHold.amount0, totalHold.amount1, sqrtP);
-        return int256(_mulDiv(nav, 1e18, supply)) - int256(_mulDiv(holdValue, 1e18, supply));
-    }
-
-    /// @dev Records the vault's cumulative alpha-vs-hold to the registry. Runs automatically on every
-    ///      deposit/withdraw/rebalance (never curator-triggered). Skipped while the oracle is not
-    ///      ready, since a checkpoint requires a trustworthy TWAP. The registry call is best-effort:
-    ///      a revert there must never block an LP action (a withdrawal in particular) — it is retried
-    ///      on the next action.
-    function _checkpointAlpha() internal {
+    /// @dev Accrues the alpha earned since the last baseline, BEFORE the current action changes any
+    ///      balances. Alpha is the vault's per-share return minus the return of simply holding the
+    ///      baseline basket, both valued at TWAP and expressed as 1e18-scaled fractions. The interval
+    ///      is added to a running accumulator so the registry ranks dimensionless scores. Skipped until
+    ///      a baseline exists (first action) or while the oracle is not ready.
+    function _accrueAlphaInterval() internal {
+        if (baseNavPerShare == 0) return;
         if (!IRudderHook(hook).isOracleReady(poolKey)) return;
         uint256 supply = totalSupply();
         if (supply == 0) return;
         uint160 sqrtP = _twapSqrtPrice();
-        uint256 nav = _totalAssetsValue();
-        uint256 holdValue = LiquidityLib.valueInToken0(totalHold.amount0, totalHold.amount1, sqrtP);
-        int256 alpha = int256(_mulDiv(nav, 1e18, supply)) - int256(_mulDiv(holdValue, 1e18, supply));
-        // Report the cumulative level; the registry turns a level series into a per-interval score.
-        try IStrategyRegistry(registry).checkpointAlpha(strategyId, alpha) {
-            lastAlpha = alpha;
-        } catch {}
+        uint256 navPerShareNow = _mulDiv(_totalAssetsValue(), 1e18, supply);
+        int256 vaultReturn = int256(_mulDiv(navPerShareNow, 1e18, baseNavPerShare)) - int256(1e18);
+        int256 holdReturn;
+        if (baseHoldValuePerShare > 0) {
+            uint256 holdNow = LiquidityLib.valueInToken0(baseHold0PerShare, baseHold1PerShare, sqrtP);
+            holdReturn = int256(_mulDiv(holdNow, 1e18, baseHoldValuePerShare)) - int256(1e18);
+        }
+        cumulativeAlpha += vaultReturn - holdReturn;
+        // Best-effort: a registry revert must never block an LP action (a withdrawal in particular);
+        // the accumulator is retried on the next action.
+        try IStrategyRegistry(registry).checkpointAlpha(strategyId, cumulativeAlpha) {} catch {}
+    }
+
+    /// @dev Re-captures the baseline AFTER the action, so the just-deposited or just-withdrawn amounts
+    ///      start the next interval rather than counting as performance. While the oracle is not ready
+    ///      the baseline is left untouched, so the next interval spans the gap.
+    function _rebaseAlphaBaseline() internal {
+        if (!IRudderHook(hook).isOracleReady(poolKey)) return;
+        uint256 supply = totalSupply();
+        if (supply == 0) {
+            baseNavPerShare = 0;
+            baseHold0PerShare = 0;
+            baseHold1PerShare = 0;
+            baseHoldValuePerShare = 0;
+            return;
+        }
+        uint160 sqrtP = _twapSqrtPrice();
+        baseNavPerShare = _mulDiv(_totalAssetsValue(), 1e18, supply);
+        baseHold0PerShare = _mulDiv(totalHold.amount0, 1e18, supply);
+        baseHold1PerShare = _mulDiv(totalHold.amount1, 1e18, supply);
+        baseHoldValuePerShare = LiquidityLib.valueInToken0(baseHold0PerShare, baseHold1PerShare, sqrtP);
     }
 
     function _performanceFee(Basket memory hb, uint256 total0, uint256 total1)
