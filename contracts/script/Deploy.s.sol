@@ -28,6 +28,7 @@ contract Deploy is Script {
     address internal constant UNICHAIN_SEPOLIA_POOL_MANAGER = 0x00B036B58a818B1BC34d502D3fE730Db729e62AC;
 
     error HookAddressMismatch(address expected, address actual);
+    error HookOwnerMismatch(address expected, address actual);
 
     struct Deployment {
         address poolManager;
@@ -40,7 +41,10 @@ contract Deploy is Script {
     function run() external returns (Deployment memory d) {
         d.poolManager = vm.envOr("POOL_MANAGER", UNICHAIN_SEPOLIA_POOL_MANAGER);
 
-        address owner = msg.sender;
+        // Owner is explicit when OWNER (or a PRIVATE_KEY to derive it from) is provided, so the
+        // deployed hook/factory are never owned by an ephemeral broadcast key by accident.
+        uint256 pk = vm.envOr("PRIVATE_KEY", uint256(0));
+        address owner = vm.envOr("OWNER", pk == 0 ? msg.sender : vm.addr(pk));
 
         vm.startBroadcast();
 
@@ -68,6 +72,9 @@ contract Deploy is Script {
         d.vaultImplementation = address(implementation);
         d.factory = address(factory);
         d.hook = address(hook);
+
+        // Never persist a deployment whose hook is owned by someone other than the intended owner.
+        if (hook.owner() != owner) revert HookOwnerMismatch(hook.owner(), owner);
 
         _writeDeployments(d);
 
