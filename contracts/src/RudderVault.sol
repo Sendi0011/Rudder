@@ -54,6 +54,7 @@ contract RudderVault is Initializable, ERC20, ReentrancyGuard, IUnlockCallback {
     error NotPoolManager();
     error TokenNotERC20();
     error SettlementMismatch();
+    error SpotTwapDeviation();
 
     struct Basket {
         uint256 amount0;
@@ -214,6 +215,15 @@ contract RudderVault is Initializable, ERC20, ReentrancyGuard, IUnlockCallback {
     {
         if (amount0 == 0 && amount1 == 0) revert ZeroAmount();
         if (recipient == address(0)) revert ZeroAmount();
+
+        // Reject deposits priced off a manipulated spot: once the TWAP is live, the spot must stay
+        // within the envelope's deviation bound of it. Withdrawals are never gated by this.
+        if (oracleBootstrapped) {
+            Envelope memory env = IStrategyRegistry(registry).getEnvelope(strategyId);
+            if (_priceImpactBps(_spotSqrtPrice(), _twapSqrtPrice()) > env.maxPriceImpactBps) {
+                revert SpotTwapDeviation();
+            }
+        }
 
         if (positionLiquidity > 0) _collect();
 
