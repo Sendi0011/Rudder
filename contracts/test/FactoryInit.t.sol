@@ -34,7 +34,9 @@ contract FactoryInitTest is RudderTestBase {
     }
 
     function _rawInitialize(RudderVault target, uint256 id) internal {
-        target.initialize(manager, address(factory), address(registry), id, curator, 1000, _poolKey(), _envelope());
+        target.initialize(
+            address(manager), address(factory), address(registry), id, curator, 1000, _poolKey(), _envelope()
+        );
     }
 
     function test_CreateVault_InitializesAtomically() public {
@@ -69,7 +71,7 @@ contract FactoryInitTest is RudderTestBase {
         ModifyLiquidityParams memory params =
             ModifyLiquidityParams({tickLower: -60, tickUpper: 60, liquidityDelta: int256(1e18), salt: bytes32(0)});
 
-        vm.prank(manager);
+        vm.prank(address(manager));
         bytes4 sel = hook.beforeAddLiquidity(vault, _poolKey(), params, "");
         assertEq(sel, IHooks.beforeAddLiquidity.selector, "factory vault must pass gate");
     }
@@ -81,7 +83,7 @@ contract FactoryInitTest is RudderTestBase {
         ModifyLiquidityParams memory params =
             ModifyLiquidityParams({tickLower: -60, tickUpper: 60, liquidityDelta: int256(1e18), salt: bytes32(0)});
 
-        vm.prank(manager);
+        vm.prank(address(manager));
         vm.expectRevert(RudderHook.OnlyVault.selector);
         hook.beforeAddLiquidity(attacker, _poolKey(), params, "");
     }
@@ -99,11 +101,20 @@ contract FactoryInitTest is RudderTestBase {
         factory.createVault(9999, _poolKey(), 1000);
     }
 
-    function test_CreateVault_MissingHookReverts() public {
+    function test_CreateVault_HookMismatchReverts() public {
         PoolKey memory k = _poolKey();
-        k.hooks = IHooks(address(0));
+        k.hooks = IHooks(address(0xBAD));
         vm.prank(curator);
-        vm.expectRevert(VaultFactory.MissingHook.selector);
+        vm.expectRevert(VaultFactory.HookMismatch.selector);
+        factory.createVault(strategyId, k, 1000);
+    }
+
+    function test_CreateVault_UninitializedPoolReverts() public {
+        PoolKey memory k = _poolKey();
+        k.fee = 500; // a fee/tickSpacing pair that has not been initialized
+        k.tickSpacing = 10;
+        vm.prank(curator);
+        vm.expectRevert(VaultFactory.PoolNotInitialized.selector);
         factory.createVault(strategyId, k, 1000);
     }
 
@@ -123,8 +134,9 @@ contract FactoryInitTest is RudderTestBase {
     function test_BadConfigRevertsAndRegistersNoVault() public {
         // A factory wired to an implementation whose initialize reverts must fail atomically:
         // no clone is left uninitialized and no vault is registered.
-        VaultFactory badFactory =
-            new VaultFactory(address(new BadInitVault()), IPoolManager(manager), address(registry));
+        VaultFactory badFactory = new VaultFactory(
+            address(new BadInitVault()), IPoolManager(address(manager)), address(registry), address(hook)
+        );
 
         address predicted =
             Clones.predictDeterministicAddress(badFactory.vaultImplementation(), bytes32(0), address(badFactory));

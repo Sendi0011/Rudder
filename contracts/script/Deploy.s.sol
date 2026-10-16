@@ -54,7 +54,9 @@ contract Deploy is Script {
         RudderHook hook = new RudderHook{salt: salt}(IPoolManager(d.poolManager), owner);
         if (address(hook) != expectedHook) revert HookAddressMismatch(expectedHook, address(hook));
 
-        VaultFactory factory = new VaultFactory(address(implementation), IPoolManager(d.poolManager), address(registry));
+        // The factory pins the hook, so the hook is deployed first and bound to the factory after.
+        VaultFactory factory =
+            new VaultFactory(address(implementation), IPoolManager(d.poolManager), address(registry), address(hook));
 
         hook.setVaultFactory(address(factory));
         // One-time owner call to authorize the factory to bind vaults to strategies.

@@ -2,6 +2,7 @@
 pragma solidity 0.8.26;
 
 import {Test} from "forge-std/Test.sol";
+import {PoolManager} from "v4-core/PoolManager.sol";
 import {IPoolManager} from "v4-core/interfaces/IPoolManager.sol";
 import {IHooks} from "v4-core/interfaces/IHooks.sol";
 import {PoolKey} from "v4-core/types/PoolKey.sol";
@@ -22,21 +23,25 @@ abstract contract RudderTestBase is Test {
     VaultFactory internal factory;
     RudderHook internal hook;
 
-    address internal manager = address(0x1111);
+    PoolManager internal manager;
+    uint160 internal constant SQRT_1_1 = 79228162514264337593543950336;
+
     address internal owner = address(this);
     address internal curator = address(0xC0FFEE);
 
     function setUp() public virtual {
+        manager = new PoolManager(address(this));
         registry = new StrategyRegistry();
         vaultImpl = new RudderVault();
-        factory = new VaultFactory(address(vaultImpl), IPoolManager(manager), address(registry));
-        hook = _deployMinedHook(manager, owner);
+        hook = _deployMinedHook(address(manager), owner);
+        factory = new VaultFactory(address(vaultImpl), IPoolManager(address(manager)), address(registry), address(hook));
         hook.setVaultFactory(address(factory));
         registry.setFactory(address(factory));
+        manager.initialize(_poolKey(), SQRT_1_1);
     }
 
     /// @dev Mines a salt so the hook lands at an address whose low 14 bits exactly match the
-    ///      permissions declared in RudderHook.getHookPermissions (beforeAddLiquidity + afterSwap).
+    ///      permissions declared in RudderHook.getHookPermissions (beforeAddLiquidity + beforeSwap).
     function _deployMinedHook(address _manager, address _owner) internal returns (RudderHook deployed) {
         bytes memory args = abi.encode(IPoolManager(_manager), _owner);
         bytes memory bytecode = abi.encodePacked(type(RudderHook).creationCode, args);

@@ -3,6 +3,8 @@ pragma solidity 0.8.26;
 
 import {IPoolManager} from "v4-core/interfaces/IPoolManager.sol";
 import {PoolKey} from "v4-core/types/PoolKey.sol";
+import {PoolIdLibrary} from "v4-core/types/PoolId.sol";
+import {StateLibrary} from "v4-core/libraries/StateLibrary.sol";
 import {Clones} from "openzeppelin-contracts/contracts/proxy/Clones.sol";
 import {Envelope} from "./libraries/EnvelopeLib.sol";
 
@@ -31,11 +33,15 @@ interface IRudderVaultInit {
 ///         directly (no PositionManager NFT).
 contract VaultFactory {
     using Clones for address;
+    using PoolIdLibrary for PoolKey;
+    using StateLibrary for IPoolManager;
 
     error InvalidImplementation();
+    error InvalidHook();
     error UnknownStrategy();
     error NotCurator();
-    error MissingHook();
+    error HookMismatch();
+    error PoolNotInitialized();
 
     event VaultCreated(address indexed vault, uint256 indexed strategyId, address indexed curator, PoolKey poolKey);
 
@@ -44,6 +50,9 @@ contract VaultFactory {
     address public immutable vaultImplementation;
     IPoolManager public immutable poolManager;
     IStrategyRegistryView public immutable registry;
+    /// @notice The single hook every vault created here must use. Pinned so a curator can never
+    ///         point a vault at an untrusted or malicious hook.
+    address public immutable hook;
 
     mapping(address => uint256) public vaultToStrategyId;
     mapping(address => bool) private _isVault;
@@ -53,11 +62,13 @@ contract VaultFactory {
     /// @notice All vaults created by this factory, in creation order.
     address[] public vaults;
 
-    constructor(address _vaultImplementation, IPoolManager _manager, address _registry) {
+    constructor(address _vaultImplementation, IPoolManager _manager, address _registry, address _hook) {
         if (_vaultImplementation == address(0)) revert InvalidImplementation();
+        if (_hook == address(0)) revert InvalidHook();
         vaultImplementation = _vaultImplementation;
         poolManager = _manager;
         registry = IStrategyRegistryView(_registry);
+        hook = _hook;
     }
 
     /// @notice Deploy and initialize a new vault for `strategyId`. Only the strategy's curator may call.
@@ -74,7 +85,12 @@ contract VaultFactory {
         address curator = registry.getCurator(strategyId);
         if (curator == address(0)) revert UnknownStrategy();
         if (msg.sender != curator) revert NotCurator();
-        if (address(poolKey.hooks) == address(0)) revert MissingHook();
+        if (address(poolKey.hooks) != hook) revert HookMismatch();
+
+        // The pool must already exist: creating a vault for an uninitialized pool would leave a
+        // position that can never be opened and an oracle that can never become ready.
+        (uint160 sqrtPriceX96,,,) = poolManager.getSlot0(poolKey.toId());
+        if (sqrtPriceX96 == 0) revert PoolNotInitialized();
 
         Envelope memory envelope = registry.getEnvelope(strategyId);
 
