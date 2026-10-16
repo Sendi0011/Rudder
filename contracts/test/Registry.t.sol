@@ -3,7 +3,7 @@ pragma solidity 0.8.26;
 
 import {Test} from "forge-std/Test.sol";
 import {StrategyRegistry} from "../src/StrategyRegistry.sol";
-import {Envelope} from "../src/libraries/EnvelopeLib.sol";
+import {Envelope, EnvelopeLib} from "../src/libraries/EnvelopeLib.sol";
 
 contract RegistryTest is Test {
     StrategyRegistry registry;
@@ -18,6 +18,7 @@ contract RegistryTest is Test {
         return Envelope({
             maxRangeWidth: 1000,
             maxCenterShift: 500,
+            maxTwapDistanceTicks: 1000,
             minRebalanceInterval: 60,
             maxPriceImpactBps: 50,
             maxNavLossBps: -500
@@ -37,6 +38,7 @@ contract RegistryTest is Test {
         Envelope memory tighter = Envelope({
             maxRangeWidth: 500,
             maxCenterShift: 250,
+            maxTwapDistanceTicks: 1000,
             minRebalanceInterval: 60,
             maxPriceImpactBps: 50,
             maxNavLossBps: -500
@@ -52,6 +54,7 @@ contract RegistryTest is Test {
         Envelope memory looser = Envelope({
             maxRangeWidth: 2000,
             maxCenterShift: 1000,
+            maxTwapDistanceTicks: 1000,
             minRebalanceInterval: 60,
             maxPriceImpactBps: 50,
             maxNavLossBps: -500
@@ -122,6 +125,23 @@ contract RegistryTest is Test {
         vm.prank(vault);
         registry.checkpointAlpha(id, -30);
         assertEq(registry.getAlpha(id), 70);
+    }
+
+    function test_TightenRevertsWhenAnyFieldLooser() public {
+        vm.prank(curator);
+        uint256 id = registry.registerStrategy(_env());
+        Envelope memory looser = _env();
+        looser.maxRangeWidth = 2000; // one field looser, rest identical
+        vm.prank(curator);
+        vm.expectRevert(EnvelopeLib.NotTighter.selector);
+        registry.tightenEnvelope(id, looser);
+    }
+
+    function test_RegisterRejectsDegenerateEnvelope() public {
+        Envelope memory bad = _env();
+        bad.maxRangeWidth = 0;
+        vm.expectRevert(EnvelopeLib.InvalidParams.selector);
+        registry.registerStrategy(bad);
     }
 
     function test_CheckpointAlpha_Unauthorized() public {

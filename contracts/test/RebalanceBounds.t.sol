@@ -36,6 +36,7 @@ contract RebalanceBoundsTest is Test {
         Envelope memory env = Envelope({
             maxRangeWidth: 100,
             maxCenterShift: 50,
+            maxTwapDistanceTicks: 1000,
             minRebalanceInterval: 10,
             maxPriceImpactBps: 100,
             maxNavLossBps: -1000
@@ -49,6 +50,7 @@ contract RebalanceBoundsTest is Test {
         Envelope memory env = Envelope({
             maxRangeWidth: 1000,
             maxCenterShift: 500,
+            maxTwapDistanceTicks: 1000,
             minRebalanceInterval: 60,
             maxPriceImpactBps: 50,
             maxNavLossBps: -500
@@ -62,6 +64,7 @@ contract RebalanceBoundsTest is Test {
         Envelope memory env = Envelope({
             maxRangeWidth: 1000,
             maxCenterShift: 500,
+            maxTwapDistanceTicks: 1000,
             minRebalanceInterval: 60,
             maxPriceImpactBps: 50,
             maxNavLossBps: -500
@@ -75,6 +78,7 @@ contract RebalanceBoundsTest is Test {
         Envelope memory env = Envelope({
             maxRangeWidth: 1000,
             maxCenterShift: 500,
+            maxTwapDistanceTicks: 1000,
             minRebalanceInterval: 60,
             maxPriceImpactBps: 50,
             maxNavLossBps: -500

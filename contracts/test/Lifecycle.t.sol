@@ -152,7 +152,7 @@ contract LifecycleTest is RudderIntegrationBase {
         // Isolate the NAV bound: every other bound is loose, so only a measured drawdown can revert.
         Envelope memory env = _envelope();
         env.maxNavLossBps = 0;
-        env.maxPriceImpactBps = type(uint32).max;
+        env.maxPriceImpactBps = 10_000; // loosen to the protocol max so only the NAV bound can trigger
         RudderVault v = _newVault(env);
         _bootstrap(v, -600, 600);
 

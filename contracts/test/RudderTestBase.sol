@@ -56,6 +56,7 @@ abstract contract RudderTestBase is Test {
         return Envelope({
             maxRangeWidth: 1000,
             maxCenterShift: 500,
+            maxTwapDistanceTicks: 1000,
             minRebalanceInterval: 60,
             maxPriceImpactBps: 50,
             maxNavLossBps: -500

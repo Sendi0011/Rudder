@@ -79,6 +79,7 @@ contract ForkLifecycleTest is Test {
         Envelope memory env = Envelope({
             maxRangeWidth: 6000,
             maxCenterShift: 3000,
+            maxTwapDistanceTicks: 6000,
             minRebalanceInterval: 1,
             maxPriceImpactBps: 10_000,
             maxNavLossBps: -5000

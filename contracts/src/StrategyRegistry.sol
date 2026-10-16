@@ -1,13 +1,12 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.26;
 
-import {Envelope} from "./libraries/EnvelopeLib.sol";
+import {Envelope, EnvelopeLib} from "./libraries/EnvelopeLib.sol";
 
 /// @title StrategyRegistry
 /// @notice Registry for curator strategies with bounded envelopes and timelocked loosening
 contract StrategyRegistry {
     error Unauthorized();
-    error InvalidParams();
     error TimelockNotReady();
     error NoPendingChange();
     error FactoryAlreadySet();
@@ -64,7 +63,7 @@ contract StrategyRegistry {
     }
 
     function registerStrategy(Envelope calldata env) external returns (uint256 id) {
-        if (env.maxRangeWidth <= 0 || env.minRebalanceInterval == 0) revert InvalidParams();
+        EnvelopeLib.validate(env);
         id = nextStrategyId++;
         strategies[id] = Strategy({curator: msg.sender, envelope: env, active: true});
         emit StrategyRegistered(id, msg.sender);
@@ -82,9 +81,11 @@ contract StrategyRegistry {
         return strategies[id].curator == who && strategies[id].active;
     }
 
+    /// @notice Apply a strictly-tighter envelope immediately. Reverts if any field is looser.
     function tightenEnvelope(uint256 id, Envelope calldata newEnv) external {
         if (strategies[id].curator != msg.sender) revert Unauthorized();
-        // Tightening is instant; compare bounds (simplified: enforce stricter means smaller values where applicable)
+        EnvelopeLib.validate(newEnv);
+        if (!EnvelopeLib.isTighter(strategies[id].envelope, newEnv)) revert EnvelopeLib.NotTighter();
         strategies[id].envelope = newEnv;
         delete pendingEnvelope[id];
         emit EnvelopeTightened(id);
@@ -92,6 +93,7 @@ contract StrategyRegistry {
 
     function queueLoosenEnvelope(uint256 id, Envelope calldata newEnv) external {
         if (strategies[id].curator != msg.sender) revert Unauthorized();
+        EnvelopeLib.validate(newEnv);
         uint256 unlockTime = block.timestamp + LOOSEN_DELAY;
         pendingEnvelope[id] = PendingEnvelope({envelope: newEnv, unlockTime: unlockTime});
         emit EnvelopeLooseningQueued(id, unlockTime);
