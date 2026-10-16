@@ -23,10 +23,12 @@ contract MigratorTest is RudderIntegrationBase {
         v = RudderVault(factory.createVault(id, key, 1000));
     }
 
+    /// @dev Two observations with negligible price impact: enough to make the oracle ready without
+    ///      leaving the spot past the protocol's deposit deviation cap.
     function _readyPool() internal {
-        _swap(true, -int256(1e18));
+        _swap(true, -int256(1e6));
         vm.warp(block.timestamp + 10);
-        _swap(true, -int256(1e18));
+        _swap(true, -int256(1e6));
         vm.warp(block.timestamp + 10);
     }
 

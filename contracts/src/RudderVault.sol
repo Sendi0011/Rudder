@@ -119,6 +119,9 @@ contract RudderVault is Initializable, ERC20, ReentrancyGuard, IUnlockCallback {
 
     uint256 public constant MINIMUM_LIQUIDITY = 1000;
     uint256 public constant PROTOCOL_MAX_FEE_BPS = 2000;
+    /// @notice Protocol-wide ceiling on the spot-vs-TWAP deviation a deposit may be priced at, applied
+    ///         on top of the strategy envelope. A curator cannot loosen it by widening the envelope.
+    uint32 public constant PROTOCOL_MAX_PRICE_IMPACT_BPS = 500;
     uint256 public lastRebalanceTimestamp;
 
     event Deposit(address indexed sender, address indexed recipient, uint256 amount0, uint256 amount1, uint256 shares);
@@ -228,12 +231,14 @@ contract RudderVault is Initializable, ERC20, ReentrancyGuard, IUnlockCallback {
         _accrueAlphaInterval();
 
         // Reject deposits priced off a manipulated spot: once the TWAP is live, the spot must stay
-        // within the envelope's deviation bound of it. Withdrawals are never gated by this.
+        // within the tighter of the envelope's deviation bound and the protocol ceiling. Withdrawals
+        // are never gated by this.
         if (oracleBootstrapped) {
             Envelope memory env = IStrategyRegistry(registry).getEnvelope(strategyId);
-            if (_priceImpactBps(_spotSqrtPrice(), _twapSqrtPrice()) > env.maxPriceImpactBps) {
-                revert SpotTwapDeviation();
-            }
+            uint32 cap = env.maxPriceImpactBps < PROTOCOL_MAX_PRICE_IMPACT_BPS
+                ? env.maxPriceImpactBps
+                : PROTOCOL_MAX_PRICE_IMPACT_BPS;
+            if (_priceImpactBps(_spotSqrtPrice(), _twapSqrtPrice()) > cap) revert SpotTwapDeviation();
         }
 
         if (positionLiquidity > 0) _collect();

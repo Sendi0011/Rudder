@@ -87,6 +87,31 @@ contract OracleDeviationTest is RudderIntegrationBase {
         tight.deposit(BIG, BIG, alice);
     }
 
+    /// @notice Even when the envelope is widened to the maximum deviation, the protocol ceiling still
+    ///         rejects a deposit priced off a manipulated spot.
+    function test_DepositRejectedAboveProtocolCap() public {
+        Envelope memory env = _envelope();
+        env.maxPriceImpactBps = 10_000; // envelope at the max; the protocol cap still applies
+        RudderVault v = _newVaultTight(env);
+
+        vm.prank(curator);
+        v.rebalance(-3000, 3000); // wide range so a test swap stays inside it
+        _fundVault(v, bob, BIG, BIG);
+        vm.prank(bob);
+        v.deposit(BIG, BIG, bob);
+
+        _readyPool();
+        assertTrue(hook.isOracleReady(key), "oracle must be ready");
+
+        // Shove the spot past the protocol ceiling in the current block (still inside the range).
+        _swap(true, -int256(8e17));
+
+        _fundVault(v, alice, BIG, BIG);
+        vm.prank(alice);
+        vm.expectRevert(RudderVault.SpotTwapDeviation.selector);
+        v.deposit(BIG, BIG, alice);
+    }
+
     /// @notice The range centre may not be pushed further from the TWAP tick than the envelope allows.
     function test_RebalanceRejectedWhenCenterTooFarFromTwap() public {
         Envelope memory env = _envelope();
