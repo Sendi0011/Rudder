@@ -10,11 +10,12 @@ import {BalanceDelta} from "v4-core/types/BalanceDelta.sol";
 import {ModifyLiquidityParams} from "v4-core/types/PoolOperation.sol";
 import {TickMath} from "v4-core/libraries/TickMath.sol";
 import {StateLibrary} from "v4-core/libraries/StateLibrary.sol";
+import {FullMath} from "v4-core/libraries/FullMath.sol";
 import {ReentrancyGuard} from "openzeppelin-contracts/contracts/utils/ReentrancyGuard.sol";
 import {ERC20} from "openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
 import {IERC20} from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Initializable} from "openzeppelin-contracts/contracts/proxy/utils/Initializable.sol";
-import {MathLib} from "./libraries/MathLib.sol";
 import {LiquidityLib} from "./libraries/LiquidityLib.sol";
 import {Envelope, EnvelopeLib} from "./libraries/EnvelopeLib.sol";
 
@@ -38,6 +39,7 @@ interface IStrategyRegistry {
 contract RudderVault is Initializable, ERC20, ReentrancyGuard, IUnlockCallback {
     using PoolIdLibrary for PoolKey;
     using StateLibrary for IPoolManager;
+    using SafeERC20 for IERC20;
 
     error InvalidInit();
     error Paused();
@@ -231,7 +233,7 @@ contract RudderVault is Initializable, ERC20, ReentrancyGuard, IUnlockCallback {
             _mint(address(this), MINIMUM_LIQUIDITY);
             shares = depositValue0 - MINIMUM_LIQUIDITY;
         } else {
-            shares = preValue0 == 0 ? depositValue0 : MathLib.mulDivDown(depositValue0, supply, preValue0);
+            shares = preValue0 == 0 ? depositValue0 : _mulDiv(depositValue0, supply, preValue0);
         }
         if (shares == 0) revert ZeroAmount();
 
@@ -265,21 +267,21 @@ contract RudderVault is Initializable, ERC20, ReentrancyGuard, IUnlockCallback {
         uint256 removed0;
         uint256 removed1;
         if (positionLiquidity > 0) {
-            uint128 lRemove = uint128(MathLib.mulDivDown(uint256(positionLiquidity), shares, supply));
+            uint128 lRemove = uint128(_mulDiv(uint256(positionLiquidity), shares, supply));
             if (lRemove > 0) {
                 (removed0, removed1) = _removeLiquidity(lRemove, address(this));
                 positionLiquidity -= lRemove;
             }
         }
 
-        uint256 total0 = removed0 + MathLib.mulDivDown(idle0, shares, supply);
-        uint256 total1 = removed1 + MathLib.mulDivDown(idle1, shares, supply);
+        uint256 total0 = removed0 + _mulDiv(idle0, shares, supply);
+        uint256 total1 = removed1 + _mulDiv(idle1, shares, supply);
 
         Basket memory hb = holdBasket[msg.sender];
         // The hold benchmark is compared like-for-like: pro-rate the account's basket to the shares
         // being redeemed, so partial withdrawals are charged fairly (not deferred to a full exit).
-        uint256 hb0 = MathLib.mulDivDown(hb.amount0, shares, userShares);
-        uint256 hb1 = MathLib.mulDivDown(hb.amount1, shares, userShares);
+        uint256 hb0 = _mulDiv(hb.amount0, shares, userShares);
+        uint256 hb1 = _mulDiv(hb.amount1, shares, userShares);
         (uint256 fee0, uint256 fee1) = _performanceFee(Basket({amount0: hb0, amount1: hb1}), total0, total1);
         amount0Out = total0 - fee0;
         amount1Out = total1 - fee1;
@@ -287,11 +289,11 @@ contract RudderVault is Initializable, ERC20, ReentrancyGuard, IUnlockCallback {
         _burn(msg.sender, shares);
         holdBasket[msg.sender].amount0 = hb.amount0 - hb0;
         holdBasket[msg.sender].amount1 = hb.amount1 - hb1;
-        totalHold.amount0 -= MathLib.mulDivDown(totalHold.amount0, shares, supply);
-        totalHold.amount1 -= MathLib.mulDivDown(totalHold.amount1, shares, supply);
+        totalHold.amount0 -= _mulDiv(totalHold.amount0, shares, supply);
+        totalHold.amount1 -= _mulDiv(totalHold.amount1, shares, supply);
 
-        if (amount0Out > 0) IERC20(Currency.unwrap(poolKey.currency0)).transfer(recipient, amount0Out);
-        if (amount1Out > 0) IERC20(Currency.unwrap(poolKey.currency1)).transfer(recipient, amount1Out);
+        if (amount0Out > 0) IERC20(Currency.unwrap(poolKey.currency0)).safeTransfer(recipient, amount0Out);
+        if (amount1Out > 0) IERC20(Currency.unwrap(poolKey.currency1)).safeTransfer(recipient, amount1Out);
         // Fees are accrued for pull-claim; the transfer is never attempted during a withdrawal.
         pendingFees0 += fee0;
         pendingFees1 += fee1;
@@ -308,8 +310,8 @@ contract RudderVault is Initializable, ERC20, ReentrancyGuard, IUnlockCallback {
         amount1 = pendingFees1;
         pendingFees0 = 0;
         pendingFees1 = 0;
-        if (amount0 > 0) IERC20(Currency.unwrap(poolKey.currency0)).transfer(feeRecipient, amount0);
-        if (amount1 > 0) IERC20(Currency.unwrap(poolKey.currency1)).transfer(feeRecipient, amount1);
+        if (amount0 > 0) IERC20(Currency.unwrap(poolKey.currency0)).safeTransfer(feeRecipient, amount0);
+        if (amount1 > 0) IERC20(Currency.unwrap(poolKey.currency1)).safeTransfer(feeRecipient, amount1);
         emit FeesClaimed(feeRecipient, amount0, amount1);
     }
 
@@ -403,9 +405,7 @@ contract RudderVault is Initializable, ERC20, ReentrancyGuard, IUnlockCallback {
         if (d < 0) {
             uint256 owed = uint256(-int256(d));
             poolManager.sync(currency);
-            if (!IERC20(Currency.unwrap(currency)).transfer(address(poolManager), owed)) {
-                revert SettlementMismatch();
-            }
+            IERC20(Currency.unwrap(currency)).safeTransfer(address(poolManager), owed);
             poolManager.settle();
         } else if (d > 0) {
             poolManager.take(currency, recipient, uint256(int256(d)));
@@ -467,6 +467,16 @@ contract RudderVault is Initializable, ERC20, ReentrancyGuard, IUnlockCallback {
         return _twapSqrtPrice();
     }
 
+    /// @notice ERC-20 address of the pool's token0 (for integrators such as the migrator).
+    function currency0() external view returns (address) {
+        return Currency.unwrap(poolKey.currency0);
+    }
+
+    /// @notice ERC-20 address of the pool's token1 (for integrators such as the migrator).
+    function currency1() external view returns (address) {
+        return Currency.unwrap(poolKey.currency1);
+    }
+
     function _totalAssetsValue() internal view returns (uint256 value0) {
         uint160 sqrtP = _twapSqrtPrice();
         value0 = LiquidityLib.valueInToken0(_idle0(), _idle1(), sqrtP);
@@ -494,7 +504,7 @@ contract RudderVault is Initializable, ERC20, ReentrancyGuard, IUnlockCallback {
         uint160 sqrtP = _twapSqrtPrice();
         uint256 nav = _totalAssetsValue();
         uint256 holdValue = LiquidityLib.valueInToken0(totalHold.amount0, totalHold.amount1, sqrtP);
-        return int256(MathLib.mulDivDown(nav, 1e18, supply)) - int256(MathLib.mulDivDown(holdValue, 1e18, supply));
+        return int256(_mulDiv(nav, 1e18, supply)) - int256(_mulDiv(holdValue, 1e18, supply));
     }
 
     /// @dev Records the change in alpha-vs-hold to the registry. Runs automatically on every
@@ -507,8 +517,7 @@ contract RudderVault is Initializable, ERC20, ReentrancyGuard, IUnlockCallback {
         uint160 sqrtP = _twapSqrtPrice();
         uint256 nav = _totalAssetsValue();
         uint256 holdValue = LiquidityLib.valueInToken0(totalHold.amount0, totalHold.amount1, sqrtP);
-        int256 alpha =
-            int256(MathLib.mulDivDown(nav, 1e18, supply)) - int256(MathLib.mulDivDown(holdValue, 1e18, supply));
+        int256 alpha = int256(_mulDiv(nav, 1e18, supply)) - int256(_mulDiv(holdValue, 1e18, supply));
         // Report the cumulative level; the registry converts a level series into a per-interval score.
         IStrategyRegistry(registry).checkpointAlpha(strategyId, alpha);
         lastAlpha = alpha;
@@ -525,10 +534,10 @@ contract RudderVault is Initializable, ERC20, ReentrancyGuard, IUnlockCallback {
         uint256 holdValue = LiquidityLib.valueInToken0(hb.amount0, hb.amount1, sqrtP);
         if (valueOut == 0 || valueOut <= holdValue) return (0, 0);
         uint256 gain = valueOut - holdValue;
-        uint256 feeValue0 = MathLib.mulDivDown(gain, feeCapBps, 10000);
+        uint256 feeValue0 = _mulDiv(gain, feeCapBps, 10000);
         if (feeValue0 == 0) return (0, 0);
-        fee0 = MathLib.mulDivDown(total0, feeValue0, valueOut);
-        fee1 = MathLib.mulDivDown(total1, feeValue0, valueOut);
+        fee0 = _mulDiv(total0, feeValue0, valueOut);
+        fee1 = _mulDiv(total1, feeValue0, valueOut);
     }
 
     // ---------------------------------------------------------------------
@@ -544,19 +553,23 @@ contract RudderVault is Initializable, ERC20, ReentrancyGuard, IUnlockCallback {
         if (sqrtPriceX96 == 0) sqrtPriceX96 = _spotSqrtPrice();
     }
 
+    /// @dev Deviation of the instantaneous spot price from the TWAP, in basis points of the TWAP.
+    ///      This is the vault's manipulation proxy: `maxPriceImpactBps` bounds how far the current
+    ///      spot may sit from the oracle price for a rebalance or deposit to be accepted. It measures
+    ///      price deviation, not the slippage of any particular trade.
     function _priceImpactBps(uint160 spot, uint160 twap) internal pure returns (uint32) {
         if (twap == 0) return 0;
         uint256 diff = spot > twap ? uint256(spot - twap) : uint256(twap - spot);
-        uint256 bps = MathLib.mulDivDown(diff, 10000, uint256(twap));
+        uint256 bps = _mulDiv(diff, 10000, uint256(twap));
         return bps > type(uint32).max ? type(uint32).max : uint32(bps);
     }
 
     function _navLossBps(uint256 pre, uint256 post) internal pure returns (int24) {
         if (pre == 0 || post >= pre) {
-            uint256 gainBps = pre == 0 ? 0 : MathLib.mulDivDown(post - pre, 10000, pre);
+            uint256 gainBps = pre == 0 ? 0 : _mulDiv(post - pre, 10000, pre);
             return gainBps > uint256(uint24(type(int24).max)) ? type(int24).max : int24(int256(gainBps));
         }
-        uint256 lossBps = MathLib.mulDivDown(pre - post, 10000, pre);
+        uint256 lossBps = _mulDiv(pre - post, 10000, pre);
         return lossBps > uint256(uint24(type(int24).max)) ? -type(int24).max : -int24(int256(lossBps));
     }
 
@@ -573,8 +586,31 @@ contract RudderVault is Initializable, ERC20, ReentrancyGuard, IUnlockCallback {
     }
 
     function _pull(Currency currency, address from, uint256 amount) internal {
-        if (!IERC20(Currency.unwrap(currency)).transferFrom(from, address(this), amount)) {
-            revert SettlementMismatch();
+        IERC20(Currency.unwrap(currency)).safeTransferFrom(from, address(this), amount);
+    }
+
+    /// @dev 512-bit fixed-point multiply/divide, rounding down (favors the vault). Never overflows
+    ///      on the intermediate product, unlike a naive a*b/denominator.
+    function _mulDiv(uint256 a, uint256 b, uint256 denominator) internal pure returns (uint256) {
+        return FullMath.mulDiv(a, b, denominator);
+    }
+
+    /// @dev Move the per-account hold benchmark pro-rata with shares on transfer (never on mint or
+    ///      burn, which the deposit/withdraw paths account for explicitly). Keeps every holder's
+    ///      benchmark attached to the shares it was created for, so a buyer inherits the seller's
+    ///      cost basis and the performance fee stays honest across transfers and migrations.
+    function _update(address from, address to, uint256 value) internal override {
+        if (from != address(0) && to != address(0)) {
+            uint256 fromBal = balanceOf(from);
+            Basket storage hbFrom = holdBasket[from];
+            uint256 moved0 = fromBal == 0 ? 0 : _mulDiv(hbFrom.amount0, value, fromBal);
+            uint256 moved1 = fromBal == 0 ? 0 : _mulDiv(hbFrom.amount1, value, fromBal);
+            hbFrom.amount0 -= moved0;
+            hbFrom.amount1 -= moved1;
+            Basket storage hbTo = holdBasket[to];
+            hbTo.amount0 += moved0;
+            hbTo.amount1 += moved1;
         }
+        super._update(from, to, value);
     }
 }
