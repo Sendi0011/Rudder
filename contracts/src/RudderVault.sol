@@ -509,7 +509,8 @@ contract RudderVault is Initializable, ERC20, ReentrancyGuard, IUnlockCallback {
         uint256 holdValue = LiquidityLib.valueInToken0(totalHold.amount0, totalHold.amount1, sqrtP);
         int256 alpha =
             int256(MathLib.mulDivDown(nav, 1e18, supply)) - int256(MathLib.mulDivDown(holdValue, 1e18, supply));
-        IStrategyRegistry(registry).checkpointAlpha(strategyId, alpha - lastAlpha);
+        // Report the cumulative level; the registry converts a level series into a per-interval score.
+        IStrategyRegistry(registry).checkpointAlpha(strategyId, alpha);
         lastAlpha = alpha;
     }
 

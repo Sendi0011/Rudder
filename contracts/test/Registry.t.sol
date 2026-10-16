@@ -123,8 +123,62 @@ contract RegistryTest is Test {
         vm.prank(vault);
         registry.checkpointAlpha(id, 100);
         vm.prank(vault);
-        registry.checkpointAlpha(id, -30);
+        registry.checkpointAlpha(id, 170);
         assertEq(registry.getAlpha(id), 70);
+    }
+
+    function test_CheckpointAlpha_SingleSampleScoresZero() public {
+        vm.prank(curator);
+        uint256 id = registry.registerStrategy(_env());
+        registry.setFactory(factory);
+        vm.prank(factory);
+        registry.setStrategyVault(id, vault);
+        vm.prank(vault);
+        registry.checkpointAlpha(id, 100);
+        assertEq(registry.getAlpha(id), 0);
+    }
+
+    function test_AlphaHistoryPrunedToLookback() public {
+        vm.prank(curator);
+        uint256 id = registry.registerStrategy(_env());
+        registry.setFactory(factory);
+        vm.prank(factory);
+        registry.setStrategyVault(id, vault);
+        vm.prank(vault);
+        registry.checkpointAlpha(id, 0);
+        vm.warp(block.timestamp + 5 days);
+        vm.prank(vault);
+        registry.checkpointAlpha(id, 10);
+        vm.warp(block.timestamp + 40 days);
+        vm.prank(vault);
+        registry.checkpointAlpha(id, 100);
+
+        // Both older samples fall outside the 30-day window; pruning keeps only the newest sample
+        // before the cutoff as the anchor plus the fresh one.
+        assertEq(registry.alphaSamples(id), 2);
+        assertEq(registry.getAlpha(id), 90);
+    }
+
+    function test_Leaderboard_OrdersByIntervalAlpha() public {
+        registry.setFactory(factory);
+        address[3] memory curators = [address(0xA1), address(0xA2), address(0xA3)];
+        int256[3] memory deltas = [int256(30), int256(120), int256(60)];
+        for (uint256 i = 0; i < 3; i++) {
+            vm.prank(curators[i]);
+            uint256 id = registry.registerStrategy(_env());
+            address v = address(uint160(0xF000 + i));
+            vm.prank(factory);
+            registry.setStrategyVault(id, v);
+            vm.prank(v);
+            registry.checkpointAlpha(id, 0);
+            vm.prank(v);
+            registry.checkpointAlpha(id, deltas[i]);
+        }
+
+        (uint256[] memory ids, int256[] memory scores) = registry.leaderboard(2);
+        assertEq(ids.length, 2);
+        assertEq(scores[0], 120);
+        assertEq(scores[1], 60);
     }
 
     function test_TightenRevertsWhenAnyFieldLooser() public {

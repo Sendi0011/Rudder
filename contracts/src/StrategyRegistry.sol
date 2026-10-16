@@ -4,7 +4,11 @@ pragma solidity 0.8.26;
 import {Envelope, EnvelopeLib} from "./libraries/EnvelopeLib.sol";
 
 /// @title StrategyRegistry
-/// @notice Registry for curator strategies with bounded envelopes and timelocked loosening
+/// @notice Registry for curator strategies with bounded envelopes and timelocked loosening.
+/// @dev    Ranking is alpha-vs-hold only (AUM and volume never feed it): the vault records its
+///         cumulative alpha-per-share on each LP action, and the score is the change over a rolling
+///         lookback window, so a strategy is ranked on per-interval performance rather than a
+///         since-inception total that stale history could inflate.
 contract StrategyRegistry {
     error Unauthorized();
     error TimelockNotReady();
@@ -24,16 +28,20 @@ contract StrategyRegistry {
         uint256 unlockTime;
     }
 
-    struct Ranking {
-        int256 cumulativeAlpha; // alpha vs hold, cumulative
-        uint256 checkpointTs; // last checkpoint timestamp
+    /// @dev A recorded (timestamp, cumulative alpha-per-share) sample. Score = newest minus the
+    ///      oldest sample still inside the lookback window.
+    struct Checkpoint {
+        uint64 ts;
+        int256 alphaPerShare;
     }
 
     uint256 public constant LOOSEN_DELAY = 24 hours;
+    /// @notice Rolling window over which per-interval alpha is measured.
+    uint32 public constant ALPHA_LOOKBACK = 30 days;
 
     mapping(uint256 => Strategy) public strategies;
     mapping(uint256 => PendingEnvelope) public pendingEnvelope;
-    mapping(uint256 => Ranking) public rankings;
+    mapping(uint256 => Checkpoint[]) internal _alphaHistory;
     mapping(uint256 => address) public strategyVault;
     uint256 public nextStrategyId;
 
@@ -46,7 +54,7 @@ contract StrategyRegistry {
     event EnvelopeTightened(uint256 indexed id);
     event EnvelopeLooseningQueued(uint256 indexed id, uint256 unlockTime);
     event EnvelopeLooseningApplied(uint256 indexed id);
-    event AlphaCheckpointed(uint256 indexed id, int256 alphaDelta, int256 cumulativeAlpha);
+    event AlphaCheckpointed(uint256 indexed id, int256 alphaPerShare);
     event FactorySet(address indexed factory);
     event StrategyVaultBound(uint256 indexed id, address indexed vault);
 
@@ -120,18 +128,80 @@ contract StrategyRegistry {
         emit StrategyVaultBound(id, vault);
     }
 
-    /// @notice Record a cumulative alpha checkpoint. Only the bound vault may call.
-    /// @dev Ranking is alpha-vs-hold over lookback; AUM/volume never feed this.
-    function checkpointAlpha(uint256 id, int256 alphaDelta) external {
+    /// @notice Record the vault's current cumulative alpha-per-share. Only the bound vault may call.
+    function checkpointAlpha(uint256 id, int256 alphaPerShare) external {
         if (strategyVault[id] != msg.sender) revert Unauthorized();
-        Ranking storage r = rankings[id];
-        r.cumulativeAlpha += alphaDelta;
-        r.checkpointTs = block.timestamp;
-        emit AlphaCheckpointed(id, alphaDelta, r.cumulativeAlpha);
+        _alphaHistory[id].push(Checkpoint({ts: uint64(block.timestamp), alphaPerShare: alphaPerShare}));
+        _prune(id);
+        emit AlphaCheckpointed(id, alphaPerShare);
     }
 
-    /// @notice Cumulative alpha-vs-hold for a strategy (the single ranking number)
-    function getAlpha(uint256 id) external view returns (int256) {
-        return rankings[id].cumulativeAlpha;
+    /// @notice Time-weighted per-interval alpha over the lookback window: the change in cumulative
+    ///         alpha-per-share between the newest sample and the oldest sample still in the window.
+    ///         Zero when a strategy has fewer than two samples in the window.
+    function getAlpha(uint256 id) public view returns (int256) {
+        Checkpoint[] storage h = _alphaHistory[id];
+        uint256 len = h.length;
+        if (len < 2) return 0;
+        return h[len - 1].alphaPerShare - h[0].alphaPerShare;
+    }
+
+    /// @notice Number of samples currently retained for a strategy (bounded by the lookback).
+    function alphaSamples(uint256 id) external view returns (uint256) {
+        return _alphaHistory[id].length;
+    }
+
+    /// @notice Top `limit` active strategies by per-interval alpha, descending. Ties keep id order.
+    function leaderboard(uint256 limit) external view returns (uint256[] memory ids, int256[] memory scores) {
+        uint256 n = nextStrategyId;
+        uint256 count;
+        for (uint256 i = 0; i < n; i++) {
+            if (strategies[i].active && strategyVault[i] != address(0)) count++;
+        }
+        if (limit > count) limit = count;
+
+        uint256[] memory allIds = new uint256[](count);
+        int256[] memory allScores = new int256[](count);
+        uint256 k;
+        for (uint256 i = 0; i < n; i++) {
+            if (strategies[i].active && strategyVault[i] != address(0)) {
+                allIds[k] = i;
+                allScores[k] = getAlpha(i);
+                k++;
+            }
+        }
+
+        for (uint256 i = 0; i < limit; i++) {
+            for (uint256 j = i + 1; j < count; j++) {
+                if (allScores[j] > allScores[i]) {
+                    (allScores[i], allScores[j]) = (allScores[j], allScores[i]);
+                    (allIds[i], allIds[j]) = (allIds[j], allIds[i]);
+                }
+            }
+        }
+
+        ids = new uint256[](limit);
+        scores = new int256[](limit);
+        for (uint256 i = 0; i < limit; i++) {
+            ids[i] = allIds[i];
+            scores[i] = allScores[i];
+        }
+    }
+
+    /// @dev Drop samples older than the lookback, keeping the newest sample before the cutoff as the
+    ///      window anchor so the score still spans the full lookback.
+    function _prune(uint256 id) internal {
+        Checkpoint[] storage h = _alphaHistory[id];
+        uint64 cutoff = block.timestamp > ALPHA_LOOKBACK ? uint64(block.timestamp - ALPHA_LOOKBACK) : 0;
+        if (cutoff == 0) return;
+        uint256 drop;
+        while (drop + 1 < h.length && h[drop + 1].ts <= cutoff) drop++;
+        if (drop == 0) return;
+        for (uint256 i = drop; i < h.length; i++) {
+            h[i - drop] = h[i];
+        }
+        for (uint256 j = 0; j < drop; j++) {
+            h.pop();
+        }
     }
 }
