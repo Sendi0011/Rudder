@@ -13,6 +13,10 @@ contract EnvelopeLibWrapper {
         return EnvelopeLib.isTighter(current, next);
     }
 
+    function validateTwapDistance(int24 centerTick, int24 twapTick, int24 maxDistance) external pure {
+        EnvelopeLib.validateTwapDistance(centerTick, twapTick, maxDistance);
+    }
+
     function validateRangeWidth(int24 width, int24 maxWidth) external pure {
         EnvelopeLib.validateRangeWidth(width, maxWidth);
     }
@@ -127,6 +131,13 @@ contract EnvelopeLibTest is Test {
         next = _base();
         next.maxNavLossBps = -1000;
         assertFalse(w.isTighter(cur, next), "deeper loss floor is looser");
+    }
+
+    function test_ValidateTwapDistance() public {
+        w.validateTwapDistance(100, 90, 50);
+        w.validateTwapDistance(-100, -90, 50);
+        vm.expectRevert(EnvelopeLib.InvalidParams.selector);
+        w.validateTwapDistance(200, 90, 50);
     }
 
     function test_ValidateRangeWidth_Ok() public view {

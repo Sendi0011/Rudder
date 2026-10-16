@@ -56,6 +56,13 @@ library EnvelopeLib {
         if (dist > maxShift) revert InvalidCenterShift(dist, maxShift);
     }
 
+    /// @notice Bound the distance between the range centre and the TWAP tick.
+    function validateTwapDistance(int24 centerTick, int24 twapTick, int24 maxDistance) internal pure {
+        int24 diff = centerTick - twapTick;
+        int24 dist = diff < 0 ? -diff : diff;
+        if (dist > maxDistance) revert InvalidParams();
+    }
+
     function validateInterval(uint256 lastTs, uint256 nowTs, uint256 minInterval) internal pure {
         if (nowTs < lastTs || nowTs - lastTs < minInterval) {
             revert IntervalTooShort(lastTs, nowTs, minInterval);

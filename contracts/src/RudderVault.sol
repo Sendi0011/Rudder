@@ -347,17 +347,22 @@ contract RudderVault is Initializable, ERC20, ReentrancyGuard, IUnlockCallback {
         int24 width = newTickUpper - newTickLower;
         EnvelopeLib.validateRangeWidth(width, env.maxRangeWidth);
 
+        int24 newCenter = (newTickLower + newTickUpper) / 2;
+        uint160 spot = _spotSqrtPrice();
+        uint160 twap = _twapSqrtPrice();
+
+        // The range centre may never drift further from the TWAP tick than the envelope allows, so
+        // liquidity cannot be parked in a regime disconnected from the oracle price.
+        EnvelopeLib.validateTwapDistance(newCenter, TickMath.getTickAtSqrtPrice(twap), env.maxTwapDistanceTicks);
+
         if (rangeSet) {
             EnvelopeLib.validateInterval(
                 uint48(lastRebalanceTimestamp), uint48(block.timestamp), env.minRebalanceInterval
             );
             int24 oldCenter = (tickLower + tickUpper) / 2;
-            int24 newCenter = (newTickLower + newTickUpper) / 2;
             EnvelopeLib.validateCenterShift(newCenter - oldCenter, env.maxCenterShift);
         }
 
-        uint160 spot = _spotSqrtPrice();
-        uint160 twap = _twapSqrtPrice();
         EnvelopeLib.validatePriceImpact(_priceImpactBps(spot, twap), env.maxPriceImpactBps);
 
         if (positionLiquidity > 0) _collect();
