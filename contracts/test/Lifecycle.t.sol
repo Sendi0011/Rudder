@@ -341,10 +341,13 @@ contract LifecycleTest is RudderIntegrationBase {
         _fund(bob, BIG, BIG);
         _deposit(bob, BIG, BIG);
 
-        // Fill the registry's fixed ring directly from the vault's own address.
+        // Fill the registry's fixed ring directly from the vault's own address. Advance a local clock
+        // rather than re-reading block.timestamp, which via-ir hoists out of the loop.
         uint256 cap = registry.MAX_CHECKPOINTS();
+        uint256 t = block.timestamp;
         for (uint256 i = 0; i < cap + 10; i++) {
-            vm.warp(block.timestamp + 1 hours);
+            t += 1 hours;
+            vm.warp(t);
             vm.prank(address(vault));
             registry.checkpointAlpha(strategyId, int256(i));
         }

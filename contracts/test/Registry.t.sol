@@ -167,8 +167,12 @@ contract RegistryTest is Test {
         registry.setStrategyVault(id, vault);
 
         uint256 cap = registry.MAX_CHECKPOINTS();
+        // Advance a local clock rather than re-reading block.timestamp: via-ir hoists that read out
+        // of the loop, so `vm.warp(block.timestamp + 1 hours)` would not progress under the optimizer.
+        uint256 t = block.timestamp;
         for (uint256 i = 0; i < cap + 25; i++) {
-            vm.warp(block.timestamp + 1 hours);
+            t += 1 hours;
+            vm.warp(t);
             vm.prank(vault);
             registry.checkpointAlpha(id, int256(i));
         }
