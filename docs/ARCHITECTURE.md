@@ -35,8 +35,9 @@ curator-operated vaults that steer a single LP range inside an on-chain mandate.
 - **`RudderVault`** holds LP assets and one v4 position plus idle balances. It opens/closes the
   position through `PoolManager.unlock` directly (no PositionManager NFT). Its `rebalance` validates
   the envelope on-chain; withdrawals are always pro-rata and never revert on a bad oracle.
-- **`RudderHook`** gates which addresses may add liquidity (only factory vaults) and maintains a
-  manipulation-resistant TWAP from pre-swap prices.
+- **`RudderHook`** gates which addresses may add liquidity (only factory vaults), independently
+  enforces each vault's live envelope on every add (alignment, width, TWAP distance, interval), and
+  maintains a manipulation-resistant TWAP from pre-swap prices. Removals are never gated.
 - **`VaultMigrator`** moves an LP between two vaults of the same pool in one transaction.
 
 ## Invariants
@@ -47,7 +48,10 @@ curator-operated vaults that steer a single LP range inside an on-chain mandate.
 - The envelope width is never exceeded by the live position.
 - `rebalance` reverts if any envelope bound (width, centre shift, interval, price impact, NAV loss,
   distance from the TWAP tick) is violated.
+- The hook's add gate never seats a vault's liquidity outside its envelope, even if the vault skips
+  its own checks; top-up adds into the live range are exempt and removals are never gated.
 - Pause suppresses deposits and rebalances and never affects withdrawals.
 
 See `THREAT_MODEL.md` for the threat/ mitigation table, `KNOWN_LIMITATIONS.md` for the known
-boundaries, and `adr/ADR-001-architecture.md` for the decisions behind this layout.
+boundaries, and `adr/ADR-001-architecture.md` and `adr/ADR-002-oracle-and-rebalance-swap.md` for the
+decisions behind this layout.

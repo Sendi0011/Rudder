@@ -111,11 +111,21 @@ contract VaultHandler is Test {
         vm.warp(block.timestamp + 10);
     }
 
+    // Last rebalance snapshot, so the invariant suite can check the envelope's NAV-loss bound.
+    uint256 public preNav;
+    uint256 public postNav;
+    int24 public maxNavLossBps;
+    bool public hasRebalanced;
+
     function rebalance(uint256 seed) external {
         vm.warp(block.timestamp + 100);
         (int24 lo, int24 hi) = seed % 2 == 0 ? (int24(-600), int24(600)) : (int24(-300), int24(300));
+        preNav = vault.totalAssetsValue();
         vm.prank(curator);
         vault.rebalance(lo, hi);
+        postNav = vault.totalAssetsValue();
+        maxNavLossBps = registry.getEnvelope(strategyId).maxNavLossBps;
+        hasRebalanced = true;
     }
 }
 
@@ -153,6 +163,19 @@ contract VaultInvariantsTest is RudderIntegrationBase {
             Envelope memory env = registry.getEnvelope(strategyId);
             assertLe(vault.tickUpper() - vault.tickLower(), env.maxRangeWidth, "range exceeds envelope");
         }
+    }
+
+    /// @notice A rebalance may only lose as much value as the envelope allows: the realized NAV
+    ///         cannot fall below the pre-rebalance NAV minus the envelope's loss bound.
+    function invariant_RebalanceWithinNavLossBound() public view {
+        if (!handler.hasRebalanced()) return;
+        uint256 pre = handler.preNav();
+        uint256 post = handler.postNav();
+        if (pre == 0) return;
+        int24 maxLoss = handler.maxNavLossBps();
+        uint256 allowedBps = maxLoss < 0 ? uint256(-int256(maxLoss)) : 0;
+        uint256 floor = pre - (pre * allowedBps) / 10_000;
+        assertGe(post + 1, floor, "rebalance loss exceeds envelope");
     }
 
     /// @notice Solvency: the vault's real holdings (idle + position, valued at the same TWAP the vault

@@ -7,7 +7,7 @@ import {PoolKey} from "v4-core/types/PoolKey.sol";
 import {PoolIdLibrary} from "v4-core/types/PoolId.sol";
 import {Currency} from "v4-core/types/Currency.sol";
 import {BalanceDelta} from "v4-core/types/BalanceDelta.sol";
-import {ModifyLiquidityParams} from "v4-core/types/PoolOperation.sol";
+import {ModifyLiquidityParams, SwapParams} from "v4-core/types/PoolOperation.sol";
 import {TickMath} from "v4-core/libraries/TickMath.sol";
 import {StateLibrary} from "v4-core/libraries/StateLibrary.sol";
 import {FullMath} from "v4-core/libraries/FullMath.sol";
@@ -64,6 +64,7 @@ contract RudderVault is Initializable, ERC20, ReentrancyGuard, IUnlockCallback {
     uint8 internal constant ACTION_COLLECT = 0;
     uint8 internal constant ACTION_ADD = 1;
     uint8 internal constant ACTION_REMOVE = 2;
+    uint8 internal constant ACTION_SWAP = 3;
 
     /// @notice TWAP window (seconds) used for all valuation.
     uint32 public constant TWAP_WINDOW = 1800;
@@ -395,6 +396,48 @@ contract RudderVault is Initializable, ERC20, ReentrancyGuard, IUnlockCallback {
         tickLower = newTickLower;
         tickUpper = newTickUpper;
         rangeSet = true;
+
+        // Rebalance the idle mix toward what the new range needs at the current price, swapping the
+        // excess side through the pool as exact input. The limit is derived from the TWAP so the
+        // realized deviation cannot exceed the envelope's price-impact bound. Whatever the single
+        // pass cannot balance (dust, slippage, or a hit price limit) is left idle and reported below.
+        uint160 sqrtP = _spotSqrtPrice();
+        int24 curTick = TickMath.getTickAtSqrtPrice(sqrtP);
+        // Our own swap must not push the pool past the band deposits accept, so bound it by the
+        // tighter of the envelope and the protocol ceiling. The post-swap check below still enforces
+        // the envelope itself.
+        uint32 impactCap = env.maxPriceImpactBps < PROTOCOL_MAX_PRICE_IMPACT_BPS
+            ? env.maxPriceImpactBps
+            : PROTOCOL_MAX_PRICE_IMPACT_BPS;
+        uint256 idle0 = _freeIdle0();
+        uint256 idle1 = _freeIdle1();
+
+        if (curTick >= newTickUpper) {
+            // Price at or above the range: the position holds only token1, so token0 is excess.
+            if (idle0 > 0) _swapWithinLimit(true, idle0, twap, impactCap);
+        } else if (curTick <= newTickLower) {
+            // Price at or below the range: the position holds only token0, so token1 is excess.
+            if (idle1 > 0) _swapWithinLimit(false, idle1, twap, impactCap);
+        } else if (idle0 > 0 && idle1 > 0) {
+            (uint256 need0, uint256 need1) = LiquidityLib.getAmountsForLiquidity(
+                sqrtP, TickMath.getSqrtPriceAtTick(newTickLower), TickMath.getSqrtPriceAtTick(newTickUpper), 1e18
+            );
+            if (need0 > 0 && need1 > 0) {
+                uint256 scaled0 = (idle0 * 1e18) / need0;
+                uint256 scaled1 = (idle1 * 1e18) / need1;
+                if (scaled0 > scaled1) {
+                    uint256 keep0 = (scaled1 * need0) / 1e18;
+                    if (idle0 > keep0) _swapWithinLimit(true, idle0 - keep0, twap, impactCap);
+                } else if (scaled1 > scaled0) {
+                    uint256 keep1 = (scaled0 * need1) / 1e18;
+                    if (idle1 > keep1) _swapWithinLimit(false, idle1 - keep1, twap, impactCap);
+                }
+            }
+        }
+
+        // Any residual deviation after our own swap must still be within the envelope.
+        EnvelopeLib.validatePriceImpact(_priceImpactBps(_spotSqrtPrice(), twap), env.maxPriceImpactBps);
+
         _addLiquidityFromIdle(_spotSqrtPrice());
 
         uint256 postNav = _totalAssetsValue();
@@ -405,6 +448,35 @@ contract RudderVault is Initializable, ERC20, ReentrancyGuard, IUnlockCallback {
         emit Rebalance(strategyId, newTickLower, newTickUpper, positionLiquidity);
     }
 
+    /// @dev Exact-input swap of `amountIn` of the input side, bounded so the spot cannot move more
+    ///      than `impactBps` (sqrt-price) past the TWAP. Returns the realized input/output deltas.
+    ///      Skips the swap when the spot has already reached the bound in the swap's direction, so a
+    ///      rebalance never reverts just because the pool is already at the price edge.
+    function _swapWithinLimit(bool zeroForOne, uint256 amountIn, uint160 twap, uint32 impactBps)
+        internal
+        returns (int256 amount0, int256 amount1)
+    {
+        if (amountIn == 0) return (0, 0);
+        uint160 limit = _sqrtLimitForImpact(twap, impactBps, zeroForOne);
+        uint160 spot = _spotSqrtPrice();
+        if (zeroForOne ? spot <= limit : spot >= limit) return (0, 0);
+        (amount0, amount1) = _swapExactIn(zeroForOne, amountIn, limit);
+    }
+
+    function _sqrtLimitForImpact(uint160 twap, uint32 impactBps, bool zeroForOne) internal pure returns (uint160) {
+        if (impactBps == 0) impactBps = 50;
+        uint256 twapU = uint256(twap);
+        uint256 limit;
+        if (zeroForOne) {
+            limit = (twapU * (10000 - impactBps)) / 10000;
+            if (limit < TickMath.MIN_SQRT_PRICE + 1) limit = TickMath.MIN_SQRT_PRICE + 1;
+        } else {
+            limit = (twapU * (10000 + impactBps)) / 10000;
+            if (limit > TickMath.MAX_SQRT_PRICE - 1) limit = TickMath.MAX_SQRT_PRICE - 1;
+        }
+        return uint160(limit);
+    }
+
     // ---------------------------------------------------------------------
     // v4 unlock plumbing
     // ---------------------------------------------------------------------
@@ -412,9 +484,24 @@ contract RudderVault is Initializable, ERC20, ReentrancyGuard, IUnlockCallback {
     /// @dev Only ever called by the PoolManager during `unlock`.
     function unlockCallback(bytes calldata data) external returns (bytes memory) {
         if (msg.sender != address(poolManager)) revert NotPoolManager();
-        (uint8 action, int24 lo, int24 hi, uint128 liquidity, address recipient) =
-            abi.decode(data, (uint8, int24, int24, uint128, address));
+        uint8 action = abi.decode(data, (uint8));
 
+        if (action == ACTION_SWAP) {
+            (, bool zeroForOne, int256 amountSpecified, uint160 sqrtPriceLimitX96) =
+                abi.decode(data, (uint8, bool, int256, uint160));
+            BalanceDelta swapDelta = poolManager.swap(
+                poolKey,
+                SwapParams({
+                    zeroForOne: zeroForOne, amountSpecified: amountSpecified, sqrtPriceLimitX96: sqrtPriceLimitX96
+                }),
+                ""
+            );
+            _settleDelta(swapDelta, address(this));
+            return abi.encode(swapDelta);
+        }
+
+        (, int24 lo, int24 hi, uint128 liquidity, address recipient) =
+            abi.decode(data, (uint8, int24, int24, uint128, address));
         int256 liquidityDelta;
         if (action == ACTION_ADD) {
             liquidityDelta = int256(uint256(liquidity));
@@ -428,7 +515,7 @@ contract RudderVault is Initializable, ERC20, ReentrancyGuard, IUnlockCallback {
             ""
         );
         _settleDelta(callerDelta, recipient);
-        return abi.encodePacked(callerDelta);
+        return abi.encode(callerDelta);
     }
 
     function _settleDelta(BalanceDelta delta, address recipient) internal {
@@ -463,6 +550,15 @@ contract RudderVault is Initializable, ERC20, ReentrancyGuard, IUnlockCallback {
         BalanceDelta delta = abi.decode(ret, (BalanceDelta));
         amount0 = uint256(int256(delta.amount0()));
         amount1 = uint256(int256(delta.amount1()));
+    }
+
+    function _swapExactIn(bool zeroForOne, uint256 amountIn, uint160 sqrtPriceLimitX96)
+        internal
+        returns (int256 amount0, int256 amount1)
+    {
+        bytes memory ret = poolManager.unlock(abi.encode(ACTION_SWAP, zeroForOne, -int256(amountIn), sqrtPriceLimitX96));
+        BalanceDelta delta = abi.decode(ret, (BalanceDelta));
+        return (delta.amount0(), delta.amount1());
     }
 
     function _addLiquidityFromIdle(uint160 sqrtP) internal returns (uint128 liquidity) {

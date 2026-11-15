@@ -12,9 +12,16 @@ import {ModifyLiquidityParams, SwapParams} from "v4-core/types/PoolOperation.sol
 import {ReentrancyGuard} from "openzeppelin-contracts/contracts/utils/ReentrancyGuard.sol";
 import {StateLibrary} from "v4-core/libraries/StateLibrary.sol";
 import {TickMath} from "v4-core/libraries/TickMath.sol";
+import {Envelope, EnvelopeLib} from "./libraries/EnvelopeLib.sol";
 
 interface IVaultFactory {
     function isVault(address who) external view returns (bool);
+    function vaultToStrategyId(address vault) external view returns (uint256);
+    function registry() external view returns (address);
+}
+
+interface IStrategyRegistryView {
+    function getEnvelope(uint256 id) external view returns (Envelope memory);
 }
 
 /// @title RudderHook
@@ -31,9 +38,12 @@ contract RudderHook is IHooks, ReentrancyGuard {
     error Paused();
     error Unauthorized();
     error FactoryAlreadySet();
+    error RangeNotAligned();
 
     uint16 public constant CAPACITY = 2048;
     uint256 public constant MIN_OBSERVATIONS = 2;
+    /// @dev Window for the TWAP used by the add-liquidity gate. Mirrors the vault's valuation window.
+    uint32 public constant TWAP_WINDOW = 1800;
 
     struct Observation {
         uint32 timestamp;
@@ -50,6 +60,16 @@ contract RudderHook is IHooks, ReentrancyGuard {
     uint256 public constant MAX_OBSERVATION_AGE = 1 hours;
 
     mapping(PoolId => Oracle) internal _oracle;
+
+    /// @dev Per-vault record of the last range-setting add, used by the add-liquidity gate to bound
+    ///      how often a vault's range may move. Top-up adds into the current range do not reset it.
+    struct VaultAdd {
+        uint48 timestamp;
+        int24 tickLower;
+        int24 tickUpper;
+    }
+
+    mapping(address => VaultAdd) internal _vaultAdd;
 
     IPoolManager public immutable poolManager;
     /// @notice The factory whose vaults are allowed to add liquidity. Set exactly once by `owner`.
@@ -262,14 +282,57 @@ contract RudderHook is IHooks, ReentrancyGuard {
         return IHooks.afterInitialize.selector;
     }
 
-    function beforeAddLiquidity(address sender, PoolKey calldata, ModifyLiquidityParams calldata, bytes calldata)
-        external
-        onlyPoolManager
-        returns (bytes4)
-    {
+    /// @notice Gate every liquidity add by a registered vault against its strategy's live envelope.
+    ///         The vault enforces the same bounds, so this is defense in depth: even a vault that
+    ///         skipped its own checks cannot seat liquidity outside the envelope. Removals are never
+    ///         gated.
+    function beforeAddLiquidity(
+        address sender,
+        PoolKey calldata key,
+        ModifyLiquidityParams calldata params,
+        bytes calldata
+    ) external onlyPoolManager returns (bytes4) {
         if (!IVaultFactory(vaultFactory).isVault(sender)) revert OnlyVault();
         if (paused) revert Paused();
+
+        int24 lo = params.tickLower;
+        int24 hi = params.tickUpper;
+        int24 spacing = key.tickSpacing;
+        if (spacing <= 0 || lo % spacing != 0 || hi % spacing != 0) revert RangeNotAligned();
+
+        uint256 strategyId = IVaultFactory(vaultFactory).vaultToStrategyId(sender);
+        address reg = IVaultFactory(vaultFactory).registry();
+        Envelope memory env = IStrategyRegistryView(reg).getEnvelope(strategyId);
+
+        int24 width = hi - lo;
+        EnvelopeLib.validateRangeWidth(width, env.maxRangeWidth);
+
+        int24 center = (lo + hi) / 2;
+        EnvelopeLib.validateTwapDistance(center, _twapTick(key), env.maxTwapDistanceTicks);
+
+        // Only a range-setting add counts against the interval: top-ups into the live range are free.
+        VaultAdd storage rec = _vaultAdd[sender];
+        if (lo != rec.tickLower || hi != rec.tickUpper) {
+            if (rec.timestamp != 0) {
+                EnvelopeLib.validateInterval(rec.timestamp, block.timestamp, env.minRebalanceInterval);
+            }
+            rec.timestamp = uint48(block.timestamp);
+            rec.tickLower = lo;
+            rec.tickUpper = hi;
+        }
+
         return IHooks.beforeAddLiquidity.selector;
+    }
+
+    /// @dev TWAP tick for the gate, read through the same oracle the vault uses. Falls back to the
+    ///      spot tick before the oracle has enough samples (first bootstrap add).
+    function _twapTick(PoolKey calldata key) internal view returns (int24 twapTick) {
+        uint160 twap = this.consult(key, TWAP_WINDOW);
+        if (twap == 0) {
+            (, twapTick,,) = poolManager.getSlot0(key.toId());
+        } else {
+            twapTick = TickMath.getTickAtSqrtPrice(twap);
+        }
     }
 
     function afterAddLiquidity(
