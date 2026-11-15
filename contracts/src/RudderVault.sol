@@ -122,7 +122,8 @@ contract RudderVault is Initializable, ERC20, ReentrancyGuard, IUnlockCallback {
     uint256 public constant PROTOCOL_MAX_FEE_BPS = 2000;
     /// @notice Protocol-wide ceiling on the spot-vs-TWAP deviation a deposit may be priced at, applied
     ///         on top of the strategy envelope. A curator cannot loosen it by widening the envelope.
-    uint32 public constant PROTOCOL_MAX_PRICE_IMPACT_BPS = 500;
+    ///         Measured in sqrt-price basis points (about double in price terms).
+    uint32 public constant PROTOCOL_MAX_PRICE_IMPACT_BPS = 50;
     uint256 public lastRebalanceTimestamp;
 
     event Deposit(address indexed sender, address indexed recipient, uint256 amount0, uint256 amount1, uint256 shares);
