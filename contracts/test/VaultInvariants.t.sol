@@ -158,7 +158,7 @@ contract VaultInvariantsTest is RudderIntegrationBase {
     /// @notice Solvency: the vault's real holdings (idle + position, valued at the same TWAP the vault
     ///         uses) must cover what it reports as LP-owned NAV plus the curator's pending fees. In
     ///         other words the vault never promises a redemption it cannot back with tokens.
-    function invariant_HoldingsCoverRedemptions() public view {
+    function invariant_HoldingsCoverRedemptions() public {
         uint160 sqrtP = vault.twapSqrtPrice();
 
         uint256 idle0 = IERC20(Currency.unwrap(key.currency0)).balanceOf(address(vault));

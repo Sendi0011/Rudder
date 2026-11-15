@@ -493,12 +493,12 @@ contract RudderVault is Initializable, ERC20, ReentrancyGuard, IUnlockCallback {
     // ---------------------------------------------------------------------
 
     /// @notice Total vault value denominated in token0 at the TWAP price (idle + position).
-    function totalAssetsValue() external view returns (uint256) {
+    function totalAssetsValue() external returns (uint256) {
         return _totalAssetsValue();
     }
 
     /// @notice The TWAP sqrt price this vault values assets at (falls back to spot if untracked).
-    function twapSqrtPrice() external view returns (uint160) {
+    function twapSqrtPrice() external returns (uint160) {
         return _twapSqrtPrice();
     }
 
@@ -512,7 +512,7 @@ contract RudderVault is Initializable, ERC20, ReentrancyGuard, IUnlockCallback {
         return Currency.unwrap(poolKey.currency1);
     }
 
-    function _totalAssetsValue() internal view returns (uint256 value0) {
+    function _totalAssetsValue() internal returns (uint256 value0) {
         uint160 sqrtP = _twapSqrtPrice();
         value0 = LiquidityLib.valueInToken0(_idle0(), _idle1(), sqrtP);
         if (positionLiquidity > 0) {
@@ -576,7 +576,6 @@ contract RudderVault is Initializable, ERC20, ReentrancyGuard, IUnlockCallback {
 
     function _performanceFee(Basket memory hb, uint256 total0, uint256 total1)
         internal
-        view
         returns (uint256 fee0, uint256 fee1)
     {
         if (!IRudderHook(hook).isOracleReady(poolKey)) return (0, 0);
@@ -599,9 +598,25 @@ contract RudderVault is Initializable, ERC20, ReentrancyGuard, IUnlockCallback {
         (sqrtPriceX96,,,) = poolManager.getSlot0(poolKey.toId());
     }
 
-    function _twapSqrtPrice() internal view returns (uint160 sqrtPriceX96) {
+    function _twapSqrtPrice() internal returns (uint160 sqrtPriceX96) {
+        bytes32 keyT;
+        assembly {
+            keyT := tload(0)
+        }
+        if (keyT != bytes32(0)) {
+            // cached
+            uint256 cached;
+            assembly {
+                cached := tload(1)
+            }
+            if (cached != 0) return uint160(cached);
+        }
         sqrtPriceX96 = IRudderHook(hook).consult(poolKey, TWAP_WINDOW);
         if (sqrtPriceX96 == 0) sqrtPriceX96 = _spotSqrtPrice();
+        assembly {
+            tstore(0, 1)
+            tstore(1, sqrtPriceX96)
+        }
     }
 
     /// @dev Deviation of the instantaneous spot price from the TWAP, in basis points of the TWAP.

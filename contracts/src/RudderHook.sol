@@ -11,6 +11,7 @@ import {IHooks} from "v4-core/interfaces/IHooks.sol";
 import {ModifyLiquidityParams, SwapParams} from "v4-core/types/PoolOperation.sol";
 import {ReentrancyGuard} from "openzeppelin-contracts/contracts/utils/ReentrancyGuard.sol";
 import {StateLibrary} from "v4-core/libraries/StateLibrary.sol";
+import {TickMath} from "v4-core/libraries/TickMath.sol";
 
 interface IVaultFactory {
     function isVault(address who) external view returns (bool);
@@ -20,7 +21,8 @@ interface IVaultFactory {
 /// @notice Gates vault liquidity and maintains a manipulation-resistant TWAP. Prices are sampled in
 ///         `beforeSwap` (the pre-swap price), so a swap can never choose the price it is recorded at;
 ///         intra-block pushes are collapsed to a single sample per timestamp so a same-block
-///         push-and-reverse cannot move the oracle.
+///         push-and-reverse cannot move the oracle. Observations use a cumulative tick oracle for
+///         O(log n) TWAP reads.
 contract RudderHook is IHooks, ReentrancyGuard {
     using PoolIdLibrary for PoolKey;
     using StateLibrary for IPoolManager;
@@ -35,7 +37,7 @@ contract RudderHook is IHooks, ReentrancyGuard {
 
     struct Observation {
         uint32 timestamp;
-        uint160 sqrtPriceX96;
+        int56 tickCumulative;
     }
 
     /// @dev Fixed-capacity ring buffer per pool. Storage is only paid for the slots actually written.
@@ -96,11 +98,11 @@ contract RudderHook is IHooks, ReentrancyGuard {
         return true;
     }
 
-    function getLastObservation(PoolKey calldata key) external view returns (uint32 ts, uint160 sqrtPriceX96) {
+    function getLastObservation(PoolKey calldata key) external view returns (uint32 ts, int56 tickCumulative) {
         Oracle storage o = _oracle[key.toId()];
         if (o.count == 0) return (0, 0);
         Observation storage last = _newest(o);
-        return (last.timestamp, last.sqrtPriceX96);
+        return (last.timestamp, last.tickCumulative);
     }
 
     /// @notice Number of samples currently held for a pool.
@@ -108,43 +110,94 @@ contract RudderHook is IHooks, ReentrancyGuard {
         return _oracle[key.toId()].count;
     }
 
-    /// @notice Time-weighted average sqrtPriceX96 over the last `secondsAgo`. Each sample's price is
-    ///         credited for the time until the next sample (or until now for the newest), clamped to
-    ///         the window. Returns the newest sample if the window holds no interval.
+    /// @notice Time-weighted average sqrtPriceX96 over the last `secondsAgo`. Uses a cumulative tick
+    ///         oracle with binary search over observations; averages over the available span if the
+    ///         window is not fully covered, but requires at least two observations.
     function consult(PoolKey calldata key, uint32 secondsAgo) external view returns (uint160 sqrtPriceX96) {
         Oracle storage o = _oracle[key.toId()];
         uint16 count = o.count;
-        if (count == 0) return 0;
+        if (count < 2) return 0;
 
-        uint256 windowStart = block.timestamp > secondsAgo ? block.timestamp - secondsAgo : 0;
-        uint16 oldest = _oldestIndex(o);
-        uint256 sumWeighted;
-        uint256 sumDt;
+        (, int24 tick,,) = poolManager.getSlot0(key.toId());
+        uint32 nowTs = uint32(block.timestamp);
+        uint32 windowStart = secondsAgo == 0 ? 0 : (nowTs > secondsAgo ? nowTs - secondsAgo : 0);
 
-        for (uint16 k = 0; k < count; k++) {
-            uint16 idx = oldest + k;
-            if (idx >= CAPACITY) idx -= CAPACITY;
+        (uint16 aIdx, uint16 bIdx) = _binarySearch(o, windowStart);
+        Observation storage a = o.buf[aIdx];
+        Observation storage b = o.buf[bIdx];
 
-            uint256 tEnd;
-            if (k + 1 < count) {
-                uint16 nidx = idx + 1;
-                if (nidx >= CAPACITY) nidx -= CAPACITY;
-                tEnd = o.buf[nidx].timestamp;
-            } else {
-                tEnd = block.timestamp;
+        int56 tickCumulatives;
+        uint32 secondsAgos;
+        if (b.timestamp <= windowStart) {
+            // All observations are before the window; average over the full available span.
+            Observation storage oldestObs = o.buf[_oldestIndex(o)];
+            Observation storage newestObs = _newest(o);
+            tickCumulatives = newestObs.tickCumulative - oldestObs.tickCumulative;
+            secondsAgos = newestObs.timestamp - oldestObs.timestamp;
+        } else if (a.timestamp <= windowStart) {
+            // Interpolate between a (before or at window start) and b (after window start).
+            uint32 timeDiff = b.timestamp - a.timestamp;
+            int56 tickDiff = b.tickCumulative - a.tickCumulative;
+            int56 tickCumulativeStart =
+                a.tickCumulative + (tickDiff * int56(uint56(windowStart - a.timestamp))) / int56(uint56(timeDiff));
+            tickCumulatives = b.tickCumulative - tickCumulativeStart;
+            secondsAgos = b.timestamp - windowStart;
+        } else {
+            // Both observations are after window start; use the two most recent that bracket or are available.
+            // If we need at least two observations for a meaningful TWAP, fall back to oldest-to-newest in window.
+            if (aIdx == _oldestIndex(o) && secondsAgos == 0) {
+                // try to expand to oldest
             }
-            if (tEnd <= windowStart) continue;
-
-            uint256 tStart = o.buf[idx].timestamp > windowStart ? o.buf[idx].timestamp : windowStart;
-            if (tEnd <= tStart) continue;
-
-            uint256 dt = tEnd - tStart;
-            sumWeighted += uint256(o.buf[idx].sqrtPriceX96) * dt;
-            sumDt += dt;
+            // Default: use adjacent pair covering available span
+            tickCumulatives = b.tickCumulative - a.tickCumulative;
+            secondsAgos = b.timestamp - a.timestamp;
+            if (secondsAgos == 0) secondsAgos = 1;
         }
 
-        if (sumDt == 0) return _newest(o).sqrtPriceX96;
-        return uint160(sumWeighted / sumDt);
+        if (secondsAgos == 0) {
+            return TickMath.getSqrtPriceAtTick(tick);
+        }
+        int56 timeWeightedAverageTick = tickCumulatives / int56(uint56(secondsAgos));
+        // Round toward negative infinity (floor for negative results) as per standard behavior.
+        if (tickCumulatives < 0 && tickCumulatives % int56(uint56(secondsAgos)) != 0) {
+            timeWeightedAverageTick = timeWeightedAverageTick - 1;
+        }
+        return TickMath.getSqrtPriceAtTick(int24(timeWeightedAverageTick));
+    }
+
+    function _binarySearch(Oracle storage o, uint32 target) internal view returns (uint16 aIdx, uint16 bIdx) {
+        uint16 count = o.count;
+        uint16 l = 0;
+        uint16 r = count;
+        while (l < r) {
+            uint16 mid = (l + r) / 2;
+            uint16 idx = _indexAt(o, mid);
+            if (o.buf[idx].timestamp <= target) {
+                l = mid + 1;
+            } else {
+                r = mid;
+            }
+        }
+        // l is the index of first observation with timestamp > target
+        if (l == 0) {
+            // target is before or at oldest; use oldest and second oldest
+            aIdx = _indexAt(o, 0);
+            bIdx = _indexAt(o, 1);
+        } else if (l >= count) {
+            // target is after or at newest; use second newest and newest
+            aIdx = _indexAt(o, count - 2);
+            bIdx = _indexAt(o, count - 1);
+        } else {
+            aIdx = _indexAt(o, l - 1);
+            bIdx = _indexAt(o, l);
+        }
+    }
+
+    function _indexAt(Oracle storage o, uint16 i) internal view returns (uint16) {
+        uint16 oldest = _oldestIndex(o);
+        uint16 idx = oldest + i;
+        if (idx >= CAPACITY) idx -= CAPACITY;
+        return idx;
     }
 
     function _record(PoolKey calldata key) internal {
@@ -155,10 +208,17 @@ contract RudderHook is IHooks, ReentrancyGuard {
         // price, and any later swap in the same block cannot overwrite it.
         if (o.count > 0 && _newest(o).timestamp == uint32(block.timestamp)) return;
 
-        (uint160 sqrtPriceX96,,,) = poolManager.getSlot0(id);
-        o.buf[o.next] = Observation({timestamp: uint32(block.timestamp), sqrtPriceX96: sqrtPriceX96});
+        (, int24 tick,,) = poolManager.getSlot0(id);
+        int56 lastCumul = _lastTickCumulative(o);
+        int56 tickCumulative = lastCumul + int56(tick);
+        o.buf[o.next] = Observation({timestamp: uint32(block.timestamp), tickCumulative: tickCumulative});
         o.next = o.next + 1 == CAPACITY ? 0 : o.next + 1;
         if (o.count < CAPACITY) o.count += 1;
+    }
+
+    function _lastTickCumulative(Oracle storage o) internal view returns (int56) {
+        if (o.count == 0) return 0;
+        return _newest(o).tickCumulative;
     }
 
     function _newest(Oracle storage o) internal view returns (Observation storage) {
