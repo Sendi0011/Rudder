@@ -21,7 +21,8 @@ badness never blocks withdrawals.
 ```
 contracts/
   src/            Solidity sources (vault, hook, registry, factory, migrator, libraries)
-  script/Deploy.s.sol
+  script/         deploy, seed and activity scripts
+  scripts/        activity loop
   test/           unit, integration, fuzz and stateful invariant tests
 frontend/         (placeholder)
 docs/             architecture, threat model, ADRs, changelog, limitations
@@ -111,12 +112,46 @@ forge verify-contract "$HOOK" contracts/src/RudderHook.sol:RudderHook --chain 13
 | Token0 |  |  |
 | Token1 |  |  |
 
+## Hookathon
+
+Rudder uses a Uniswap v4 hook as the enforcement point for curated liquidity. The hook address is
+mined for its exact permission bits, and `VaultFactory` pins that address so every vault shares the
+same gating and price source.
+
+### What to show
+
+The reviewer walkthrough is in [`docs/DEMO.md`](docs/DEMO.md): register a bounded strategy, create a
+vault, deposit, swap to prime the TWAP, rebalance inside and outside the envelope, reject a
+manipulated deposit, withdraw through a stale oracle, rank strategies, and migrate in one transaction.
+
+### v4 surface
+
+- `beforeAddLiquidity` allows liquidity changes only from factory-created vaults.
+- `beforeSwap` records the pre-swap tick at most once per timestamp into a fixed ring, so a swapper
+  cannot choose the price used by the vault's TWAP.
+- Vaults call `PoolManager.unlock` directly; no NFT position manager holds the position.
+- The hook is deployed with CREATE2 at an address whose low bits match its permissions, and the
+  factory refuses any pool that does not use that hook.
+
+### Run it locally
+
+```sh
+forge fmt --check
+FOUNDRY_PROFILE=ci forge test
+```
+
+See [Deployment](#deployment) for RPC setup and script commands. No broadcast or live deployment is
+performed by these local commands. Development friction and remaining open items are collected in
+[`docs/FEEDBACK.md`](docs/FEEDBACK.md) and [`docs/OPEN_QUESTIONS.md`](docs/OPEN_QUESTIONS.md).
+
 ## Documentation
 
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — components and invariants
+- [`docs/DEMO.md`](docs/DEMO.md) — reviewer walkthrough
 - [`docs/THREAT_MODEL.md`](docs/THREAT_MODEL.md) — threats, vectors, mitigations
 - [`docs/KNOWN_LIMITATIONS.md`](docs/KNOWN_LIMITATIONS.md) — boundaries and open work
 - [`docs/CHANGELOG.md`](docs/CHANGELOG.md) — notable changes
 - [`docs/OPEN_QUESTIONS.md`](docs/OPEN_QUESTIONS.md) — open items
 - [`docs/FEEDBACK.md`](docs/FEEDBACK.md) — Uniswap v4 developer friction encountered while building
 - [`docs/adr/ADR-001-architecture.md`](docs/adr/ADR-001-architecture.md) — architecture decisions
+- [`docs/adr/ADR-002-oracle-and-rebalance-swap.md`](docs/adr/ADR-002-oracle-and-rebalance-swap.md) — oracle and rebalance decisions
