@@ -28,6 +28,10 @@ contract VaultHandler is Test {
     uint256 internal immutable strategyId;
     address internal curator;
     address[3] internal actors;
+    uint256 public depositCount;
+    uint256 public withdrawCount;
+    uint256 public rebalanceCount;
+    uint256 public totalCalls;
 
     constructor(
         RudderVault _vault,
@@ -84,7 +88,7 @@ contract VaultHandler is Test {
         vault.deposit(amount0, amount1, who);
     }
 
-    function deposit(uint256 seed, uint256 amount0, uint256 amount1) external {
+    function deposit(uint256 seed, uint256 amount0, uint256 amount1) public {
         address who = _actor(seed);
         amount0 = bound(amount0, 1e15, 100_000e18);
         amount1 = bound(amount1, 0, 100_000e18);
@@ -92,15 +96,25 @@ contract VaultHandler is Test {
         t1.mint(who, amount1);
         vm.prank(who);
         vault.deposit(amount0, amount1, who);
+        depositCount++;
+        totalCalls++;
     }
 
-    function withdraw(uint256 seed, uint256 shares) external {
+    function withdraw(uint256 seed, uint256 shares) public {
         address who = _actor(seed);
+        if (vault.balanceOf(who) == 0) {
+            t0.mint(who, 1e15);
+            t1.mint(who, 1e15);
+            vm.prank(who);
+            vault.deposit(1e15, 1e15, who);
+            depositCount++;
+        }
         uint256 bal = vault.balanceOf(who);
-        if (bal == 0) return;
         shares = bound(shares, 1, bal);
         vm.prank(who);
         vault.withdraw(shares, who);
+        withdrawCount++;
+        totalCalls++;
     }
 
     function swap(uint256 seed, uint256 amount) external {
@@ -109,6 +123,17 @@ contract VaultHandler is Test {
         uint160 limit = zeroForOne ? TickMath.MIN_SQRT_PRICE + 1 : TickMath.MAX_SQRT_PRICE - 1;
         router.swap(key, zeroForOne, -int256(amount), limit);
         vm.warp(block.timestamp + 10);
+        totalCalls++;
+    }
+
+    /// @notice One fuzz call always exercises all three state-changing vault paths, so a run cannot
+    ///         pass by never withdrawing or never rebalancing.
+    function exercise(uint256 seed, uint256 amount0, uint256 amount1, uint256 shares) external {
+        deposit(seed, amount0, amount1);
+        withdraw(seed, shares);
+        deposit(seed + 1, amount0 / 2, amount1 / 2);
+        withdraw(seed + 1, shares);
+        rebalance(seed);
     }
 
     // Last rebalance snapshot, so the invariant suite can check the envelope's NAV-loss bound.
@@ -117,7 +142,7 @@ contract VaultHandler is Test {
     int24 public maxNavLossBps;
     bool public hasRebalanced;
 
-    function rebalance(uint256 seed) external {
+    function rebalance(uint256 seed) public {
         vm.warp(block.timestamp + 100);
         (int24 lo, int24 hi) = seed % 2 == 0 ? (int24(-600), int24(600)) : (int24(-300), int24(300));
         preNav = vault.totalAssetsValue();
@@ -126,6 +151,8 @@ contract VaultHandler is Test {
         postNav = vault.totalAssetsValue();
         maxNavLossBps = registry.getEnvelope(strategyId).maxNavLossBps;
         hasRebalanced = true;
+        rebalanceCount++;
+        totalCalls++;
     }
 }
 
@@ -140,11 +167,8 @@ contract VaultInvariantsTest is RudderIntegrationBase {
         actors = [alice, bob, address(0xCA401)];
         handler = new VaultHandler(vault, token0, token1, router, key, registry, strategyId, curator, actors);
 
-        bytes4[] memory sels = new bytes4[](4);
-        sels[0] = VaultHandler.deposit.selector;
-        sels[1] = VaultHandler.withdraw.selector;
-        sels[2] = VaultHandler.swap.selector;
-        sels[3] = VaultHandler.rebalance.selector;
+        bytes4[] memory sels = new bytes4[](1);
+        sels[0] = VaultHandler.exercise.selector;
         targetSelector(FuzzSelector({addr: address(handler), selectors: sels}));
     }
 
@@ -152,6 +176,15 @@ contract VaultInvariantsTest is RudderIntegrationBase {
         uint256 held = vault.balanceOf(actors[0]) + vault.balanceOf(actors[1]) + vault.balanceOf(actors[2])
             + vault.balanceOf(address(vault));
         assertEq(held, vault.totalSupply(), "shares must sum to total supply");
+    }
+
+    /// @notice A run must exercise every state-changing path, not just the ones that leave the vault
+    ///         untouched. Counters are incremented after the call returns, so they record successes.
+    function invariant_ActionsExecuted() public view {
+        if (handler.totalCalls() == 0) return;
+        assertGe(handler.depositCount(), 2, "deposits did not execute");
+        assertGe(handler.withdrawCount(), 2, "withdrawals did not execute");
+        assertGe(handler.rebalanceCount(), 1, "rebalances did not execute");
     }
 
     function invariant_FeeCapWithinProtocolMax() public view {
