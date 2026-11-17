@@ -29,7 +29,7 @@ curator-operated vaults that steer a single LP range inside an on-chain mandate.
 
 - **`StrategyRegistry`** is the source of truth for each strategy's `Envelope` and curator. Envelopes
   tighten instantly and loosen behind a 24h timelock. Ranking is per-interval alpha versus a hold
-  benchmark.
+  benchmark, anchored at the lookback cutoff and read through bounded leaderboard pages.
 - **`VaultFactory`** clones vaults as minimal proxies, pins the single trusted hook, and requires the
   pool to already be initialized and to use that hook.
 - **`RudderVault`** holds LP assets and one v4 position plus idle balances. It opens/closes the
