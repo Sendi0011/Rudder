@@ -47,6 +47,70 @@ Fork test against a live network (skipped when the RPC is unset):
 UNICHAIN_SEPOLIA_RPC_URL=<rpc> forge test --match-contract ForkLifecycleTest -vvv
 ```
 
+## Deployment
+
+Copy `.env.example` to `.env`, fill the variable names, then load it:
+
+```sh
+cp .env.example .env
+source .env
+```
+
+The fork lifecycle test runs only when an RPC is configured:
+
+```sh
+forge test --match-contract ForkLifecycleTest -vvv
+```
+
+Dry-run each script against the configured RPC without broadcasting:
+
+```sh
+forge script contracts/script/Deploy.s.sol:Deploy --rpc-url "$UNICHAIN_SEPOLIA_RPC_URL" -vvv
+forge script contracts/script/Seed.s.sol:Seed --rpc-url "$UNICHAIN_SEPOLIA_RPC_URL" -vvv
+forge script contracts/script/Activity.s.sol:Activity --rpc-url "$UNICHAIN_SEPOLIA_RPC_URL" -vvv
+```
+
+Broadcast only after reviewing the dry-run output:
+
+```sh
+forge script contracts/script/Deploy.s.sol:Deploy --rpc-url "$UNICHAIN_SEPOLIA_RPC_URL" --broadcast -vvv
+forge script contracts/script/Seed.s.sol:Seed --rpc-url "$UNICHAIN_SEPOLIA_RPC_URL" --broadcast -vvv
+```
+
+`Deploy.s.sol` writes `contracts/deployments.json`; `Seed.s.sol` writes `contracts/seed.json`. Run
+`scripts/activity.sh` to send one small swap per loop iteration:
+
+```sh
+scripts/activity.sh
+```
+
+Verify the deployed contracts with the deployed addresses and constructor arguments:
+
+```sh
+POOL_MANAGER=$(jq -r .poolManager contracts/deployments.json)
+REGISTRY=$(jq -r .strategyRegistry contracts/deployments.json)
+IMPLEMENTATION=$(jq -r .vaultImplementation contracts/deployments.json)
+FACTORY=$(jq -r .vaultFactory contracts/deployments.json)
+HOOK=$(jq -r .rudderHook contracts/deployments.json)
+
+forge verify-contract "$REGISTRY" contracts/src/StrategyRegistry.sol:StrategyRegistry --chain 1301
+forge verify-contract "$IMPLEMENTATION" contracts/src/RudderVault.sol:RudderVault --chain 1301
+forge verify-contract "$FACTORY" contracts/src/VaultFactory.sol:VaultFactory --chain 1301 \
+  --constructor-args "$(cast abi-encode 'constructor(address,address,address,address)' "$IMPLEMENTATION" "$POOL_MANAGER" "$REGISTRY" "$HOOK")"
+forge verify-contract "$HOOK" contracts/src/RudderHook.sol:RudderHook --chain 1301 \
+  --constructor-args "$(cast abi-encode 'constructor(address,address)' "$POOL_MANAGER" "$OWNER")"
+```
+
+| Contract | Address | Notes |
+| --- | --- | --- |
+| RudderHook |  |  |
+| StrategyRegistry |  |  |
+| RudderVault implementation |  |  |
+| VaultFactory |  |  |
+| PoolManager |  |  |
+| Token0 |  |  |
+| Token1 |  |  |
+
 ## Documentation
 
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — components and invariants
