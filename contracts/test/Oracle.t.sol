@@ -34,6 +34,7 @@ contract OracleTest is RudderIntegrationBase {
     uint256 internal constant DEP = 100_000e18;
     uint16 internal constant CAPACITY = 2048;
     address internal lp = address(0x1D0);
+    uint256 internal clock;
 
     function _prime() internal {
         vm.prank(curator);
@@ -52,11 +53,19 @@ contract OracleTest is RudderIntegrationBase {
         v.deposit(DEP, DEP, lp);
     }
 
+    /// @dev Advance a local clock instead of re-reading `block.timestamp`: via-ir hoists that read
+    ///      out of loops, which would collapse repeated samples into one timestamp.
+    function _advance(uint256 spacing) internal {
+        if (clock == 0) clock = block.timestamp;
+        clock += spacing;
+        vm.warp(clock);
+    }
+
     /// @dev Record exactly one sample at the current block, then advance the clock so the next swap
     ///      records again.
     function _sample() internal {
         _swap(true, -int256(1e6));
-        vm.warp(block.timestamp + 1);
+        _advance(1);
     }
 
     function _consultGas() internal view returns (uint256 g) {
@@ -124,7 +133,7 @@ contract OracleTest is RudderIntegrationBase {
     function _sampleAt(PoolKey memory pool, bool zeroForOne, uint256 amount, uint32 spacing) internal {
         uint160 limit = zeroForOne ? TickMath.MIN_SQRT_PRICE + 1 : TickMath.MAX_SQRT_PRICE - 1;
         router.swap(pool, zeroForOne, -int256(amount), limit);
-        vm.warp(block.timestamp + spacing);
+        _advance(spacing);
     }
 
     function _tick(PoolKey memory pool) internal view returns (int24) {
