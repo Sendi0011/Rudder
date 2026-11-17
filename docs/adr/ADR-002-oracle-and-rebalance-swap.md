@@ -10,10 +10,14 @@ allowed to add liquidity through the hook.
 
 ## Decisions
 - **Cumulative tick oracle in the hook.** `beforeSwap` records the *pre-swap* tick into a fixed
-  per-pool ring buffer (`CAPACITY = 2048`). One sample per timestamp, so a same-block push-and-reverse
-  cannot move the oracle. `consult` binary-searches the ring and interpolates the cumulative tick,
-  giving an O(log n) TWAP and averaging over the available span when the window is not fully covered.
-  `MIN_OBSERVATIONS = 2`; `MAX_OBSERVATION_AGE = 1 hour`.
+  per-pool ring buffer (`CAPACITY = 2048`). A sample stores `lastCumulative + tick * elapsed`, where
+  `elapsed` is the time since the previous sample; the first sample stores zero. One sample per
+  timestamp, so a same-block push-and-reverse cannot move the oracle. `consult` extends the newest
+  cumulative to `block.timestamp` with the current tick, binary-searches the ring for the first
+  observation at or after the window start, and interpolates the cumulative there; a window starting
+  before the oldest sample uses the oldest sample as the start. The average tick is the cumulative
+  difference divided by the elapsed seconds, rounded toward negative infinity. `MIN_OBSERVATIONS = 2`;
+  `MAX_OBSERVATION_AGE = 1 hour`.
 - **One TWAP read per transaction.** The vault caches the TWAP in transient storage (`tstore`) for the
   life of a transaction, so repeated valuations within one action cost a single `consult`. This makes
   `totalAssetsValue`, `twapSqrtPrice`, `_twapSqrtPrice`, and `_performanceFee` non-`view` and makes the

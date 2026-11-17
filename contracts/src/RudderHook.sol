@@ -130,61 +130,56 @@ contract RudderHook is IHooks, ReentrancyGuard {
         return _oracle[key.toId()].count;
     }
 
-    /// @notice Time-weighted average sqrtPriceX96 over the last `secondsAgo`. Uses a cumulative tick
-    ///         oracle with binary search over observations; averages over the available span if the
-    ///         window is not fully covered, but requires at least two observations.
+    /// @notice Time-weighted average sqrtPriceX96 over the last `secondsAgo`. The cumulative tick is
+    ///         extended to `block.timestamp` with the current tick, and the cumulative at the window
+    ///         start is interpolated between its bracketing observations. If the window starts before
+    ///         the oldest sample, the oldest sample is used as the start instead. Requires at least two
+    ///         observations.
     function consult(PoolKey calldata key, uint32 secondsAgo) external view returns (uint160 sqrtPriceX96) {
         Oracle storage o = _oracle[key.toId()];
         uint16 count = o.count;
-        if (count < 2) return 0;
+        if (count < MIN_OBSERVATIONS) return 0;
 
-        (, int24 tick,,) = poolManager.getSlot0(key.toId());
+        (, int24 currentTick,,) = poolManager.getSlot0(key.toId());
         uint32 nowTs = uint32(block.timestamp);
-        uint32 windowStart = secondsAgo == 0 ? 0 : (nowTs > secondsAgo ? nowTs - secondsAgo : 0);
+        uint32 startTs = secondsAgo == 0 || nowTs <= secondsAgo ? 0 : nowTs - secondsAgo;
 
-        (uint16 aIdx, uint16 bIdx) = _binarySearch(o, windowStart);
-        Observation storage a = o.buf[aIdx];
-        Observation storage b = o.buf[bIdx];
-
-        int56 tickCumulatives;
-        uint32 secondsAgos;
-        if (b.timestamp <= windowStart) {
-            // All observations are before the window; average over the full available span.
-            Observation storage oldestObs = o.buf[_oldestIndex(o)];
-            Observation storage newestObs = _newest(o);
-            tickCumulatives = newestObs.tickCumulative - oldestObs.tickCumulative;
-            secondsAgos = newestObs.timestamp - oldestObs.timestamp;
-        } else if (a.timestamp <= windowStart) {
-            // Interpolate between a (before or at window start) and b (after window start).
-            uint32 timeDiff = b.timestamp - a.timestamp;
-            int56 tickDiff = b.tickCumulative - a.tickCumulative;
-            int56 tickCumulativeStart =
-                a.tickCumulative + (tickDiff * int56(uint56(windowStart - a.timestamp))) / int56(uint56(timeDiff));
-            tickCumulatives = b.tickCumulative - tickCumulativeStart;
-            secondsAgos = b.timestamp - windowStart;
+        Observation storage oldest = o.buf[_oldestIndex(o)];
+        Observation storage newest = _newest(o);
+        int256 cumulativeStart;
+        if (startTs <= oldest.timestamp) {
+            startTs = oldest.timestamp;
+            cumulativeStart = oldest.tickCumulative;
+        } else if (startTs >= newest.timestamp) {
+            startTs = newest.timestamp;
+            cumulativeStart = newest.tickCumulative;
         } else {
-            // Both observations are after window start; use the two most recent that bracket or are available.
-            // If we need at least two observations for a meaningful TWAP, fall back to oldest-to-newest in window.
-            if (aIdx == _oldestIndex(o) && secondsAgos == 0) {
-                // try to expand to oldest
-            }
-            // Default: use adjacent pair covering available span
-            tickCumulatives = b.tickCumulative - a.tickCumulative;
-            secondsAgos = b.timestamp - a.timestamp;
-            if (secondsAgos == 0) secondsAgos = 1;
+            (uint16 aIdx, uint16 bIdx) = _binarySearch(o, startTs);
+            Observation storage a = o.buf[aIdx];
+            Observation storage b = o.buf[bIdx];
+            int256 slope = int256(b.tickCumulative) - int256(a.tickCumulative);
+            cumulativeStart = int256(a.tickCumulative)
+                + _floorDiv(slope * int256(uint256(startTs - a.timestamp)), int256(uint256(b.timestamp - a.timestamp)));
         }
 
-        if (secondsAgos == 0) {
-            return TickMath.getSqrtPriceAtTick(tick);
-        }
-        int56 timeWeightedAverageTick = tickCumulatives / int56(uint56(secondsAgos));
-        // Round toward negative infinity (floor for negative results) as per standard behavior.
-        if (tickCumulatives < 0 && tickCumulatives % int56(uint56(secondsAgos)) != 0) {
-            timeWeightedAverageTick = timeWeightedAverageTick - 1;
-        }
-        return TickMath.getSqrtPriceAtTick(int24(timeWeightedAverageTick));
+        int256 cumulativeNow =
+            int256(newest.tickCumulative) + int256(currentTick) * int256(uint256(nowTs - newest.timestamp));
+        uint32 elapsed = nowTs - startTs;
+        if (elapsed == 0) return TickMath.getSqrtPriceAtTick(currentTick);
+
+        int256 averageTick = _floorDiv(cumulativeNow - cumulativeStart, int256(uint256(elapsed)));
+        return TickMath.getSqrtPriceAtTick(int24(averageTick));
     }
 
+    /// @dev Integer division rounded toward negative infinity.
+    function _floorDiv(int256 numerator, int256 denominator) internal pure returns (int256) {
+        int256 quotient = numerator / denominator;
+        if (numerator < 0 && numerator % denominator != 0) quotient -= 1;
+        return quotient;
+    }
+
+    /// @dev First observation strictly after `target`. Callers only use it when `target` is bracketed
+    ///      by two samples, so the returned indices are always in range.
     function _binarySearch(Oracle storage o, uint32 target) internal view returns (uint16 aIdx, uint16 bIdx) {
         uint16 count = o.count;
         uint16 l = 0;
@@ -198,19 +193,8 @@ contract RudderHook is IHooks, ReentrancyGuard {
                 r = mid;
             }
         }
-        // l is the index of first observation with timestamp > target
-        if (l == 0) {
-            // target is before or at oldest; use oldest and second oldest
-            aIdx = _indexAt(o, 0);
-            bIdx = _indexAt(o, 1);
-        } else if (l >= count) {
-            // target is after or at newest; use second newest and newest
-            aIdx = _indexAt(o, count - 2);
-            bIdx = _indexAt(o, count - 1);
-        } else {
-            aIdx = _indexAt(o, l - 1);
-            bIdx = _indexAt(o, l);
-        }
+        aIdx = _indexAt(o, l - 1);
+        bIdx = _indexAt(o, l);
     }
 
     function _indexAt(Oracle storage o, uint16 i) internal view returns (uint16) {
@@ -229,16 +213,14 @@ contract RudderHook is IHooks, ReentrancyGuard {
         if (o.count > 0 && _newest(o).timestamp == uint32(block.timestamp)) return;
 
         (, int24 tick,,) = poolManager.getSlot0(id);
-        int56 lastCumul = _lastTickCumulative(o);
-        int56 tickCumulative = lastCumul + int56(tick);
+        int56 tickCumulative;
+        if (o.count > 0) {
+            Observation storage last = _newest(o);
+            tickCumulative = last.tickCumulative + int56(tick) * int56(uint56(block.timestamp - last.timestamp));
+        }
         o.buf[o.next] = Observation({timestamp: uint32(block.timestamp), tickCumulative: tickCumulative});
         o.next = o.next + 1 == CAPACITY ? 0 : o.next + 1;
         if (o.count < CAPACITY) o.count += 1;
-    }
-
-    function _lastTickCumulative(Oracle storage o) internal view returns (int56) {
-        if (o.count == 0) return 0;
-        return _newest(o).tickCumulative;
     }
 
     function _newest(Oracle storage o) internal view returns (Observation storage) {
