@@ -12,7 +12,7 @@ import {RudderHook} from "../src/RudderHook.sol";
 /// @title Deploy
 /// @notice Deploys the full Rudder stack. The hook is deployed with CREATE2 (via Foundry's default
 ///         deterministic deployment proxy) at an address whose low 14 bits encode the required
-///         permissions (beforeAddLiquidity + afterSwap). The salt is mined at runtime against the
+///         permissions (beforeAddLiquidity + beforeSwap). The salt is mined at runtime against the
 ///         SAME deployer Foundry uses for `new Hook{salt: ...}`, so the mined address always matches
 ///         the deployed address.
 ///

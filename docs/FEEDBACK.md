@@ -61,6 +61,6 @@ source file changed:
 
 This is benign pointer drift with no source modifications and no effect on the build (imports
 resolve through the top-level `v4-core` via remappings). It is also *local*: a fresh
-`git clone --recurse-submodules` reproduces a clean `v4-periphery` (verified). The friction is
+`git clone --recurse-submodules` reproduces a clean `v4-periphery`. The friction is
 that a plain `git status` in a vendored-v4 project is misleading until you inspect the nested
 `git -C contracts/lib/v4-periphery status`.

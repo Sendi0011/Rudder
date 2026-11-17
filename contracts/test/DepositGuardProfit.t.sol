@@ -113,6 +113,66 @@ contract DepositGuardProfitTest is RudderIntegrationBase {
         }
     }
 
+    /// @notice The same round trip with the spot pushed the other way. Logs the deviation and leak.
+    function test_BestRoundTripProfitOppositeDirection() public {
+        RudderVault v = _prime();
+
+        _fundVault(v, attacker, DEP, DEP);
+        uint160 twap = v.twapSqrtPrice();
+        uint256 startVal = _walletValue(attacker, twap);
+
+        _swap(false, -int256(3500e18));
+        uint160 spot = _sqrtPrice();
+        uint256 dev = _devBps(spot, twap);
+
+        vm.prank(attacker);
+        uint256 shares = v.deposit(DEP, DEP, attacker);
+        vm.prank(attacker);
+        v.withdraw(shares, attacker);
+
+        uint256 endVal = _walletValue(attacker, twap);
+        uint256 depVal = LiquidityLib.valueInToken0(DEP, DEP, twap);
+        emit log_named_uint("opposite deviation bps", dev);
+        if (endVal > startVal) {
+            uint256 leakBps = ((endVal - startVal) * 10000) / depVal;
+            emit log_named_uint("opposite round-trip leak bps", leakBps);
+            assertLt(leakBps, FEE_BPS, "opposite-direction leak exceeds the swap fee");
+        } else {
+            emit log_named_int("opposite round-trip loss0", -int256(startVal - endVal));
+        }
+    }
+
+    /// @notice A token1-heavy deposit priced at the same tolerated deviation cannot leak past the fee.
+    function test_Token1HeavyRoundTripProfitBelowSwapFee() public {
+        RudderVault v = _prime();
+        uint256 amount0 = DEP / 4;
+        uint256 amount1 = DEP * 3;
+
+        _fundVault(v, attacker, amount0, amount1);
+        uint160 twap = v.twapSqrtPrice();
+        uint256 startVal = _walletValue(attacker, twap);
+
+        _swap(true, -int256(3500e18));
+        uint160 spot = _sqrtPrice();
+        uint256 dev = _devBps(spot, twap);
+
+        vm.prank(attacker);
+        uint256 shares = v.deposit(amount0, amount1, attacker);
+        vm.prank(attacker);
+        v.withdraw(shares, attacker);
+
+        uint256 endVal = _walletValue(attacker, twap);
+        uint256 depVal = LiquidityLib.valueInToken0(amount0, amount1, twap);
+        emit log_named_uint("token1-heavy deviation bps", dev);
+        if (endVal > startVal) {
+            uint256 leakBps = ((endVal - startVal) * 10000) / depVal;
+            emit log_named_uint("token1-heavy leak bps", leakBps);
+            assertLt(leakBps, FEE_BPS, "token1-heavy leak exceeds the swap fee");
+        } else {
+            emit log_named_int("token1-heavy round-trip loss0", -int256(startVal - endVal));
+        }
+    }
+
     /// @notice With the spot at the TWAP (no manipulation) the round trip cannot leak at all.
     function test_RoundTripAtTwapLeaksNothing() public {
         RudderVault v = _prime();

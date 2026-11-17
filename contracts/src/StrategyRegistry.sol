@@ -7,10 +7,10 @@ import {Envelope, EnvelopeLib} from "./libraries/EnvelopeLib.sol";
 /// @notice Registry for curator strategies with bounded envelopes and timelocked loosening.
 /// @dev    Ranking is alpha-vs-hold only (AUM and volume never feed it): each vault reports its
 ///         running alpha accumulator on every LP action, and the score is that accumulator minus the
-///         oldest sample still inside the lookback window, so a strategy is ranked on per-interval
-///         performance rather than a since-inception total that stale history could inflate. Samples
-///         are persisted at most once per `CHECKPOINT_INTERVAL` into a fixed-capacity ring, so the
-///         history can never grow unbounded no matter how often a vault acts.
+///         accumulator at the start of the lookback window, interpolated between bracketing samples.
+///         A mid-window deposit or withdrawal therefore cannot change the score. Samples are persisted
+///         at most once per `CHECKPOINT_INTERVAL` into a fixed-capacity ring, and the leaderboard reads
+///         bounded pages of bound strategies, so neither history nor query size grows unbounded.
 contract StrategyRegistry {
     error Unauthorized();
     error TimelockNotReady();
@@ -27,6 +27,8 @@ contract StrategyRegistry {
     uint32 public constant CHECKPOINT_INTERVAL = 1 hours;
     /// @notice Fixed number of alpha samples retained per strategy (ring buffer, oldest overwritten).
     uint256 public constant MAX_CHECKPOINTS = 720;
+    /// @notice Maximum number of strategies scored in one leaderboard call.
+    uint256 public constant MAX_LEADERBOARD_PAGE = 100;
 
     struct Strategy {
         address curator;
@@ -39,8 +41,8 @@ contract StrategyRegistry {
         uint256 unlockTime;
     }
 
-    /// @dev A recorded (timestamp, cumulative alpha) sample. The score is the vault's live
-    ///      accumulator minus the oldest sample still inside the lookback window.
+    /// @dev A recorded (timestamp, cumulative alpha) sample. Bracketing samples interpolate the
+    ///      accumulator at the lookback cutoff used by the score.
     struct Checkpoint {
         uint64 ts;
         int256 cumulativeAlpha;
@@ -60,6 +62,9 @@ contract StrategyRegistry {
     mapping(uint256 => int256) public alphaAccumulator;
     mapping(uint256 => AlphaHistory) internal _alphaHistory;
     mapping(uint256 => address) public strategyVault;
+    /// @notice Strategies with a bound vault, in binding order. Lets the leaderboard read a bounded
+    ///         page without scanning every strategy ever registered.
+    uint256[] internal rankedStrategies;
     uint256 public nextStrategyId;
 
     /// @notice Deployer; may set the factory address exactly once.
@@ -142,6 +147,7 @@ contract StrategyRegistry {
         if (strategies[id].curator == address(0)) revert UnknownStrategy();
         if (strategyVault[id] != address(0)) revert StrategyAlreadyBound();
         strategyVault[id] = vault;
+        rankedStrategies.push(id);
         emit StrategyVaultBound(id, vault);
     }
 
@@ -160,25 +166,57 @@ contract StrategyRegistry {
         emit AlphaCheckpointed(id, cumulativeAlpha);
     }
 
-    /// @notice Per-interval alpha over the lookback window: the vault's live accumulator minus the
-    ///         oldest sample still inside the window. The anchor is the newest sample when every
-    ///         retained sample predates the window (a dormant strategy), which yields zero.
+    /// @notice Alpha earned over the lookback window: the vault's live accumulator minus the
+    ///         accumulator at the cutoff. The cutoff value is interpolated between the samples that
+    ///         bracket it, so an extra checkpoint caused by a deposit or withdrawal does not change
+    ///         the score. If every retained sample predates the window, the newest sample anchors the
+    ///         score, which is zero for a dormant strategy.
     function getAlpha(uint256 id) public view returns (int256) {
         AlphaHistory storage h = _alphaHistory[id];
         uint256 n = h.count;
         if (n == 0) return 0;
         uint256 cutoff = block.timestamp > ALPHA_LOOKBACK ? block.timestamp - ALPHA_LOOKBACK : 0;
         uint256 oldest = _oldestIndex(h);
-        uint256 anchor = _newestIndex(h);
-        for (uint256 i = 0; i < n; i++) {
-            uint256 idx = oldest + i;
-            if (idx >= MAX_CHECKPOINTS) idx -= MAX_CHECKPOINTS;
-            if (h.samples[idx].ts >= cutoff) {
-                anchor = idx;
-                break;
-            }
+        uint256 pos = _firstAtOrAfter(h, oldest, n, cutoff);
+        if (pos == n) return alphaAccumulator[id] - h.samples[_newestIndex(h)].cumulativeAlpha;
+
+        Checkpoint memory nextPoint = h.samples[_ringIndex(oldest, pos)];
+        if (pos == 0 || nextPoint.ts == cutoff) return alphaAccumulator[id] - nextPoint.cumulativeAlpha;
+
+        Checkpoint memory previous = h.samples[_ringIndex(oldest, pos - 1)];
+        int256 cumulativeAtCutoff = previous.cumulativeAlpha
+            + _floorDiv(
+                (nextPoint.cumulativeAlpha - previous.cumulativeAlpha) * int256(uint256(cutoff - previous.ts)),
+                int256(uint256(nextPoint.ts - previous.ts))
+            );
+        return alphaAccumulator[id] - cumulativeAtCutoff;
+    }
+
+    /// @dev First logical sample at or after `cutoff`, or `n` when none exists.
+    function _firstAtOrAfter(AlphaHistory storage h, uint256 oldest, uint256 n, uint256 cutoff)
+        internal
+        view
+        returns (uint256)
+    {
+        uint256 lo;
+        uint256 hi = n;
+        while (lo < hi) {
+            uint256 mid = (lo + hi) / 2;
+            if (h.samples[_ringIndex(oldest, mid)].ts >= cutoff) hi = mid;
+            else lo = mid + 1;
         }
-        return alphaAccumulator[id] - h.samples[anchor].cumulativeAlpha;
+        return lo;
+    }
+
+    function _ringIndex(uint256 oldest, uint256 offset) internal pure returns (uint256 idx) {
+        idx = oldest + offset;
+        if (idx >= MAX_CHECKPOINTS) idx -= MAX_CHECKPOINTS;
+    }
+
+    function _floorDiv(int256 numerator, int256 denominator) internal pure returns (int256) {
+        int256 quotient = numerator / denominator;
+        if (numerator < 0 && numerator % denominator != 0) quotient -= 1;
+        return quotient;
     }
 
     /// @notice Number of samples currently retained for a strategy (hard-bounded by `MAX_CHECKPOINTS`).
@@ -186,41 +224,65 @@ contract StrategyRegistry {
         return _alphaHistory[id].count;
     }
 
-    /// @notice Top `limit` active strategies by per-interval alpha, descending. Ties keep id order.
+    /// @notice Top `limit` strategies by per-interval alpha among the first `MAX_LEADERBOARD_PAGE`
+    ///         bound strategies, descending. Ties keep id order. The scored set is capped so the call
+    ///         cannot exceed an eth_call gas limit; `leaderboardPage` reaches later strategies.
     function leaderboard(uint256 limit) external view returns (uint256[] memory ids, int256[] memory scores) {
-        uint256 n = nextStrategyId;
-        uint256 count;
-        for (uint256 i = 0; i < n; i++) {
-            if (strategies[i].active && strategyVault[i] != address(0)) count++;
-        }
-        if (limit > count) limit = count;
-
-        uint256[] memory allIds = new uint256[](count);
-        int256[] memory allScores = new int256[](count);
-        uint256 k;
-        for (uint256 i = 0; i < n; i++) {
-            if (strategies[i].active && strategyVault[i] != address(0)) {
-                allIds[k] = i;
-                allScores[k] = getAlpha(i);
-                k++;
+        uint256 total = rankedStrategies.length;
+        uint256 scored = total < MAX_LEADERBOARD_PAGE ? total : MAX_LEADERBOARD_PAGE;
+        (ids, scores) = _scoreRange(0, scored);
+        if (limit < scored) {
+            uint256[] memory topIds = new uint256[](limit);
+            int256[] memory topScores = new int256[](limit);
+            for (uint256 i = 0; i < limit; i++) {
+                topIds[i] = ids[i];
+                topScores[i] = scores[i];
             }
+            return (topIds, topScores);
+        }
+    }
+
+    /// @notice A bounded slice of bound strategies ordered by per-interval alpha, descending.
+    ///         `offset` skips bound strategies and `limit` is capped at `MAX_LEADERBOARD_PAGE`.
+    function leaderboardPage(uint256 offset, uint256 limit)
+        external
+        view
+        returns (uint256[] memory ids, int256[] memory scores)
+    {
+        uint256 total = rankedStrategies.length;
+        if (offset >= total) return (new uint256[](0), new int256[](0));
+        uint256 available = total - offset;
+        if (limit > MAX_LEADERBOARD_PAGE) limit = MAX_LEADERBOARD_PAGE;
+        if (limit > available) limit = available;
+        return _scoreRange(offset, limit);
+    }
+
+    function _scoreRange(uint256 offset, uint256 count)
+        internal
+        view
+        returns (uint256[] memory ids, int256[] memory scores)
+    {
+        ids = new uint256[](count);
+        scores = new int256[](count);
+        for (uint256 i = 0; i < count; i++) {
+            uint256 id = rankedStrategies[offset + i];
+            ids[i] = id;
+            scores[i] = getAlpha(id);
         }
 
-        for (uint256 i = 0; i < limit; i++) {
+        for (uint256 i = 0; i < count; i++) {
             for (uint256 j = i + 1; j < count; j++) {
-                if (allScores[j] > allScores[i]) {
-                    (allScores[i], allScores[j]) = (allScores[j], allScores[i]);
-                    (allIds[i], allIds[j]) = (allIds[j], allIds[i]);
+                if (scores[j] > scores[i]) {
+                    (scores[i], scores[j]) = (scores[j], scores[i]);
+                    (ids[i], ids[j]) = (ids[j], ids[i]);
                 }
             }
         }
+    }
 
-        ids = new uint256[](limit);
-        scores = new int256[](limit);
-        for (uint256 i = 0; i < limit; i++) {
-            ids[i] = allIds[i];
-            scores[i] = allScores[i];
-        }
+    /// @notice Number of strategies with a bound vault (the leaderboard population).
+    function rankedCount() external view returns (uint256) {
+        return rankedStrategies.length;
     }
 
     /// @dev Index of the oldest valid sample. While the ring is not yet full, samples occupy

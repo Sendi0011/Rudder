@@ -21,7 +21,8 @@ badness never blocks withdrawals.
 ```
 contracts/
   src/            Solidity sources (vault, hook, registry, factory, migrator, libraries)
-  script/Deploy.s.sol
+  script/         deploy, seed and activity scripts
+  scripts/        activity loop
   test/           unit, integration, fuzz and stateful invariant tests
 frontend/         (placeholder)
 docs/             architecture, threat model, ADRs, changelog, limitations
@@ -47,12 +48,110 @@ Fork test against a live network (skipped when the RPC is unset):
 UNICHAIN_SEPOLIA_RPC_URL=<rpc> forge test --match-contract ForkLifecycleTest -vvv
 ```
 
+## Deployment
+
+Copy `.env.example` to `.env`, fill the variable names, then load it:
+
+```sh
+cp .env.example .env
+source .env
+```
+
+The fork lifecycle test runs only when an RPC is configured:
+
+```sh
+forge test --match-contract ForkLifecycleTest -vvv
+```
+
+Dry-run each script against the configured RPC without broadcasting:
+
+```sh
+forge script contracts/script/Deploy.s.sol:Deploy --rpc-url "$UNICHAIN_SEPOLIA_RPC_URL" -vvv
+forge script contracts/script/Seed.s.sol:Seed --rpc-url "$UNICHAIN_SEPOLIA_RPC_URL" -vvv
+forge script contracts/script/Activity.s.sol:Activity --rpc-url "$UNICHAIN_SEPOLIA_RPC_URL" -vvv
+```
+
+Broadcast only after reviewing the dry-run output:
+
+```sh
+forge script contracts/script/Deploy.s.sol:Deploy --rpc-url "$UNICHAIN_SEPOLIA_RPC_URL" --broadcast -vvv
+forge script contracts/script/Seed.s.sol:Seed --rpc-url "$UNICHAIN_SEPOLIA_RPC_URL" --broadcast -vvv
+```
+
+`Deploy.s.sol` writes `contracts/deployments.json`; `Seed.s.sol` writes `contracts/seed.json`. Run
+`scripts/activity.sh` to send one small swap per loop iteration:
+
+```sh
+scripts/activity.sh
+```
+
+Verify the deployed contracts with the deployed addresses and constructor arguments:
+
+```sh
+POOL_MANAGER=$(jq -r .poolManager contracts/deployments.json)
+REGISTRY=$(jq -r .strategyRegistry contracts/deployments.json)
+IMPLEMENTATION=$(jq -r .vaultImplementation contracts/deployments.json)
+FACTORY=$(jq -r .vaultFactory contracts/deployments.json)
+HOOK=$(jq -r .rudderHook contracts/deployments.json)
+
+forge verify-contract "$REGISTRY" contracts/src/StrategyRegistry.sol:StrategyRegistry --chain 1301
+forge verify-contract "$IMPLEMENTATION" contracts/src/RudderVault.sol:RudderVault --chain 1301
+forge verify-contract "$FACTORY" contracts/src/VaultFactory.sol:VaultFactory --chain 1301 \
+  --constructor-args "$(cast abi-encode 'constructor(address,address,address,address)' "$IMPLEMENTATION" "$POOL_MANAGER" "$REGISTRY" "$HOOK")"
+forge verify-contract "$HOOK" contracts/src/RudderHook.sol:RudderHook --chain 1301 \
+  --constructor-args "$(cast abi-encode 'constructor(address,address)' "$POOL_MANAGER" "$OWNER")"
+```
+
+| Contract | Address | Notes |
+| --- | --- | --- |
+| RudderHook |  |  |
+| StrategyRegistry |  |  |
+| RudderVault implementation |  |  |
+| VaultFactory |  |  |
+| PoolManager |  |  |
+| Token0 |  |  |
+| Token1 |  |  |
+
+## Hookathon
+
+Rudder uses a Uniswap v4 hook as the enforcement point for curated liquidity. The hook address is
+mined for its exact permission bits, and `VaultFactory` pins that address so every vault shares the
+same gating and price source.
+
+### What to show
+
+The reviewer walkthrough is in [`docs/DEMO.md`](docs/DEMO.md): register a bounded strategy, create a
+vault, deposit, swap to prime the TWAP, rebalance inside and outside the envelope, reject a
+manipulated deposit, withdraw through a stale oracle, rank strategies, and migrate in one transaction.
+
+### v4 surface
+
+- `beforeAddLiquidity` allows liquidity changes only from factory-created vaults.
+- `beforeSwap` records the pre-swap tick at most once per timestamp into a fixed ring, so a swapper
+  cannot choose the price used by the vault's TWAP.
+- Vaults call `PoolManager.unlock` directly; no NFT position manager holds the position.
+- The hook is deployed with CREATE2 at an address whose low bits match its permissions, and the
+  factory refuses any pool that does not use that hook.
+
+### Run it locally
+
+```sh
+forge fmt --check
+FOUNDRY_PROFILE=ci forge test
+```
+
+See [Deployment](#deployment) for RPC setup and script commands. No broadcast or live deployment is
+performed by these local commands. Development friction and remaining open items are collected in
+[`docs/FEEDBACK.md`](docs/FEEDBACK.md) and [`docs/OPEN_QUESTIONS.md`](docs/OPEN_QUESTIONS.md).
+
 ## Documentation
 
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — components and invariants
+- [`docs/DEMO.md`](docs/DEMO.md) — reviewer walkthrough
 - [`docs/THREAT_MODEL.md`](docs/THREAT_MODEL.md) — threats, vectors, mitigations
 - [`docs/KNOWN_LIMITATIONS.md`](docs/KNOWN_LIMITATIONS.md) — boundaries and open work
 - [`docs/CHANGELOG.md`](docs/CHANGELOG.md) — notable changes
-- [`docs/OPEN_QUESTIONS.md`](docs/OPEN_QUESTIONS.md) — unverified items
+- [`docs/OPEN_QUESTIONS.md`](docs/OPEN_QUESTIONS.md) — open items
 - [`docs/FEEDBACK.md`](docs/FEEDBACK.md) — Uniswap v4 developer friction encountered while building
 - [`docs/adr/ADR-001-architecture.md`](docs/adr/ADR-001-architecture.md) — architecture decisions
+- [`docs/adr/ADR-002-oracle-and-rebalance-swap.md`](docs/adr/ADR-002-oracle-and-rebalance-swap.md) — oracle and rebalance decisions

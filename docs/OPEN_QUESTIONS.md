@@ -1,6 +1,6 @@
 # Open Questions
 
-Anything that cannot be verified from this repository, or that remains a deliberate open item.
+Anything that cannot be established from this repository, or that remains a deliberate open item.
 Kept short and current.
 
 ## Open
@@ -16,7 +16,7 @@ Kept short and current.
 - **Static analysis.** `slither` was not installed in the development environment, so no automated
   static-analysis results are claimed.
 
-## Verified
+## Reference
 
 - **Unichain Sepolia v4 addresses** (chainId 1301), from
   https://docs.uniswap.org/contracts/v4/deployments and sepolia.uniscan.xyz:

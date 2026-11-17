@@ -451,13 +451,13 @@ contract RudderVault is Initializable, ERC20, ReentrancyGuard, IUnlockCallback {
 
     /// @dev Exact-input swap of `amountIn` of the input side, bounded so the spot cannot move more
     ///      than `impactBps` (sqrt-price) past the TWAP. Returns the realized input/output deltas.
-    ///      Skips the swap when the spot has already reached the bound in the swap's direction, so a
-    ///      rebalance never reverts just because the pool is already at the price edge.
+    ///      Skips the swap when the cap is zero or the spot has already reached the bound in the
+    ///      swap's direction, so a rebalance never reverts just because the pool is at the price edge.
     function _swapWithinLimit(bool zeroForOne, uint256 amountIn, uint160 twap, uint32 impactBps)
         internal
         returns (int256 amount0, int256 amount1)
     {
-        if (amountIn == 0) return (0, 0);
+        if (amountIn == 0 || impactBps == 0) return (0, 0);
         uint160 limit = _sqrtLimitForImpact(twap, impactBps, zeroForOne);
         uint160 spot = _spotSqrtPrice();
         if (zeroForOne ? spot <= limit : spot >= limit) return (0, 0);
@@ -465,7 +465,6 @@ contract RudderVault is Initializable, ERC20, ReentrancyGuard, IUnlockCallback {
     }
 
     function _sqrtLimitForImpact(uint160 twap, uint32 impactBps, bool zeroForOne) internal pure returns (uint160) {
-        if (impactBps == 0) impactBps = 50;
         uint256 twapU = uint256(twap);
         uint256 limit;
         if (zeroForOne) {

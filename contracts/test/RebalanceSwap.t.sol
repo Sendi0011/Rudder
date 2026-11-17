@@ -71,6 +71,19 @@ contract RebalanceSwapTest is RudderIntegrationBase {
         _readyPool();
     }
 
+    /// @dev Seeds a vault and makes the oracle ready without moving spot away from tick 0.
+    function _primeWithTinySamples(Envelope memory env) internal returns (RudderVault v) {
+        v = _newVault(env);
+        vm.prank(curator);
+        v.rebalance(-3000, 3000);
+        _fundVault(v, alice, SHALLOW, SHALLOW);
+        _depositInto(v, alice, SHALLOW);
+        _swap(true, -int256(1));
+        vm.warp(block.timestamp + 10);
+        _swap(true, -int256(1));
+        vm.warp(block.timestamp + 10);
+    }
+
     // ------------------------------------------------------------------
     // swap direction: the excess side is swapped out, the needed side is bought
     // ------------------------------------------------------------------
@@ -179,6 +192,36 @@ contract RebalanceSwapTest is RudderIntegrationBase {
         vm.prank(curator);
         vm.expectPartialRevert(EnvelopeLib.PriceImpactTooHigh.selector);
         v.rebalance(300, 600);
+    }
+
+    /// @notice A zero impact cap forbids any rebalance swap: the limit and the post-swap check agree.
+    function test_ZeroImpactCapSkipsSwap() public {
+        Envelope memory env = _envelope();
+        env.maxPriceImpactBps = 0;
+        RudderVault v = _primeWithTinySamples(env);
+
+        uint160 before = _sqrtPrice();
+        uint256 idle0Before = token0.balanceOf(address(v));
+        vm.prank(curator);
+        v.rebalance(600, 1200);
+
+        assertEq(_sqrtPrice(), before, "zero cap must not move spot");
+        assertEq(token0.balanceOf(address(v)), idle0Before, "zero cap must leave the excess side idle");
+        assertEq(v.tickLower(), 600);
+        assertEq(v.tickUpper(), 1200);
+    }
+
+    /// @notice A spot already away from the TWAP is rejected before any swap when the cap is zero.
+    function test_ZeroImpactCapRejectsDeviatedSpot() public {
+        Envelope memory env = _envelope();
+        env.maxPriceImpactBps = 0;
+        RudderVault v = _primeWithTinySamples(env);
+
+        _swap(true, -int256(50e18));
+
+        vm.prank(curator);
+        vm.expectPartialRevert(EnvelopeLib.PriceImpactTooHigh.selector);
+        v.rebalance(600, 1200);
     }
 
     /// @notice The realized NAV after a rebalance is never below the pre-rebalance NAV minus the

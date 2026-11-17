@@ -8,7 +8,7 @@ Date: 2026-10-13
 - Oracle safety: withdrawals MUST NEVER revert on oracle state. If TWAP stale or < min observations, withdraw succeeds with zero performance fee. Deposits and rebalances revert on bad oracle.
 - Pause blocks deposits/rebalances only; never withdrawals. Tightening instant; loosening timelocked.
 - Ranking alpha-vs-hold over lookback; AUM/volume display-only. One-tx migration; fee crystallizes on exit.
-- First-depositor share inflation (donation attack) protection via virtual shares or minimum-liquidity lock (T4).
+- First-depositor share inflation (donation attack) protection via virtual shares or minimum-liquidity lock.
 - Rounding favors vault and remaining LPs. ReentrancyGuard, custom errors, NatSpec on all external. Solidity 0.8.26, Foundry, via_ir if needed, evm_version cancun.
 - Unichain Sepolia; verify official v4 addresses from docs; record unknowns in OPEN_QUESTIONS.md.
 - Known limitation: hold benchmark rewards any LP return above hold including passive LP return.

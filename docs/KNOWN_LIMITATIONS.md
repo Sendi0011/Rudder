@@ -25,16 +25,20 @@ each item is either an accepted design trade-off or work that is not yet done.
 
 ## Resolved
 
-- **Alpha history is bounded.** A vault reports its cumulative alpha on every action, but samples are
-  persisted into a fixed-capacity ring (720 slots) at most once per `CHECKPOINT_INTERVAL`, so a
-  strategy that acts every block can no longer grow storage without bound. The score is the live
-  accumulator minus the oldest sample still inside the 30-day lookback window.
+- **Alpha history and leaderboard reads are bounded.** A vault reports its cumulative alpha on every
+  action, but samples are persisted into a fixed-capacity ring (720 slots) at most once per
+  `CHECKPOINT_INTERVAL`, so a strategy that acts every block can no longer grow storage without bound.
+  `getAlpha` binary-searches the ring, and the leaderboard scores at most `MAX_LEADERBOARD_PAGE` (100)
+  bound strategies per call with `leaderboardPage` reaching later slices.
 - **Ranking is return-based, not level-based.** The score is a cumulative per-interval
   `vaultReturn − holdReturn` fraction rather than a raw price difference, so vaults of different size
   and token decimals are comparable on the same scale.
 - **Mid-window flows no longer distort the score.** The interval is accrued from the pre-action
   baseline and the baseline is rebased afterwards, so a large deposit or withdrawal inside the window
-  is never mistaken for performance.
+  is never mistaken for performance. The registry anchors the score at the lookback cutoff,
+  interpolated between bracketing samples, so an extra checkpoint caused by that flow does not move
+  the anchor. The first interval after launch is unscored: with one sample, the cutoff anchor is that
+  sample itself.
 - **Deposits are capped by a protocol ceiling.** The spot-vs-TWAP deviation bound on deposits is the
   tighter of the strategy envelope and `PROTOCOL_MAX_PRICE_IMPACT_BPS`, so a curator cannot disable the
   guard by widening its own envelope.
@@ -45,9 +49,8 @@ each item is either an accepted design trade-off or work that is not yet done.
 
 - **Fork test against the live network.** `contracts/test/Fork.t.sol` compiles and is skipped (not
   failed) when `UNICHAIN_SEPOLIA_RPC_URL` is unset. It has not been executed against a real RPC in
-  this environment. The official Unichain Sepolia addresses are verified and recorded in
-  `OPEN_QUESTIONS.md`; the local integration suite runs against the canonical v4 `PoolManager`
-  deployed in-process.
+  this environment. The official Unichain Sepolia addresses are recorded in `OPEN_QUESTIONS.md`;
+  the local integration suite runs against the canonical v4 `PoolManager` deployed in-process.
 - **Deployment has only been dry-run.** `Deploy.s.sol` was exercised offline (no `--broadcast`);
   a real broadcast to Unichain Sepolia still requires an RPC and a funded key. The hook salt is
   mined at runtime against the CREATE2 deployer, so it cannot go stale.
