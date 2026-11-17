@@ -175,7 +175,7 @@ contract RegistryTest is Test {
 
         uint256 cap = registry.MAX_CHECKPOINTS();
         // Advance a local clock rather than re-reading block.timestamp: via-ir hoists that read out
-        // of the loop, so `vm.warp(block.timestamp + 1 hours)` would not progress under the optimizer.
+        // of the loop, so `vm.warp(block.timestamp + 1 hours)` would not advance under the optimizer.
         uint256 t = block.timestamp;
         for (uint256 i = 0; i < cap + 25; i++) {
             t += 1 hours;

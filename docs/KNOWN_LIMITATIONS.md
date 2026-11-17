@@ -49,9 +49,8 @@ each item is either an accepted design trade-off or work that is not yet done.
 
 - **Fork test against the live network.** `contracts/test/Fork.t.sol` compiles and is skipped (not
   failed) when `UNICHAIN_SEPOLIA_RPC_URL` is unset. It has not been executed against a real RPC in
-  this environment. The official Unichain Sepolia addresses are verified and recorded in
-  `OPEN_QUESTIONS.md`; the local integration suite runs against the canonical v4 `PoolManager`
-  deployed in-process.
+  this environment. The official Unichain Sepolia addresses are recorded in `OPEN_QUESTIONS.md`;
+  the local integration suite runs against the canonical v4 `PoolManager` deployed in-process.
 - **Deployment has only been dry-run.** `Deploy.s.sol` was exercised offline (no `--broadcast`);
   a real broadcast to Unichain Sepolia still requires an RPC and a funded key. The hook salt is
   mined at runtime against the CREATE2 deployer, so it cannot go stale.

@@ -3,7 +3,12 @@ out/
 forge-cache/
 contracts/cache/
 contracts/out/
+snapshots/
+**/snapshots/
 .env
+**/.env
+broadcast/
+**/broadcast/
 node_modules/
 dist/
 .next/

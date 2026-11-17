@@ -1,6 +1,6 @@
 # Open Questions
 
-Anything that cannot be verified from this repository, or that remains a deliberate open item.
+Anything that cannot be established from this repository, or that remains a deliberate open item.
 Kept short and current.
 
 ## Open

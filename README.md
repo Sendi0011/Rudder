@@ -53,6 +53,6 @@ UNICHAIN_SEPOLIA_RPC_URL=<rpc> forge test --match-contract ForkLifecycleTest -vv
 - [`docs/THREAT_MODEL.md`](docs/THREAT_MODEL.md) — threats, vectors, mitigations
 - [`docs/KNOWN_LIMITATIONS.md`](docs/KNOWN_LIMITATIONS.md) — boundaries and open work
 - [`docs/CHANGELOG.md`](docs/CHANGELOG.md) — notable changes
-- [`docs/OPEN_QUESTIONS.md`](docs/OPEN_QUESTIONS.md) — unverified items
+- [`docs/OPEN_QUESTIONS.md`](docs/OPEN_QUESTIONS.md) — open items
 - [`docs/FEEDBACK.md`](docs/FEEDBACK.md) — Uniswap v4 developer friction encountered while building
 - [`docs/adr/ADR-001-architecture.md`](docs/adr/ADR-001-architecture.md) — architecture decisions
