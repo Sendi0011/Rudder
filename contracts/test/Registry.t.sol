@@ -25,6 +25,13 @@ contract RegistryTest is Test {
         });
     }
 
+    function _registerBound(address _curator, address _vault) internal returns (uint256 id) {
+        vm.prank(_curator);
+        id = registry.registerStrategy(_env());
+        vm.prank(factory);
+        registry.setStrategyVault(id, _vault);
+    }
+
     function test_RegisterStrategy() public {
         vm.prank(curator);
         uint256 id = registry.registerStrategy(_env());
@@ -138,7 +145,7 @@ contract RegistryTest is Test {
         assertEq(registry.getAlpha(id), 0);
     }
 
-    function test_AlphaAnchorIsOldestSampleInWindow() public {
+    function test_AlphaAtCutoffIsInterpolated() public {
         vm.prank(curator);
         uint256 id = registry.registerStrategy(_env());
         registry.setFactory(factory);
@@ -153,10 +160,10 @@ contract RegistryTest is Test {
         vm.prank(vault);
         registry.checkpointAlpha(id, 100);
 
-        // All three samples are retained, but the first (40 days back) is outside the 30-day window,
-        // so the second anchors the score: live accumulator (100) - anchor (60) == 40.
+        // The 30-day cutoff falls 15/40 of the way from the first sample (0) to the second (60),
+        // so the cutoff accumulator is 22 and the score is 100 - 22 == 78.
         assertEq(registry.alphaSamples(id), 3);
-        assertEq(registry.getAlpha(id), 40);
+        assertEq(registry.getAlpha(id), 78);
     }
 
     function test_AlphaHistoryBoundedByRingBuffer() public {
@@ -180,6 +187,119 @@ contract RegistryTest is Test {
         // The ring keeps only the newest `cap` samples; the 25 oldest are overwritten.
         assertEq(registry.alphaSamples(id), cap, "history must be bounded by the ring");
         assertEq(registry.getAlpha(id), int256(cap + 24) - int256(25));
+    }
+
+    function test_MidWindowDepositCheckpointDoesNotChangeScore() public {
+        registry.setFactory(factory);
+        uint256 withDeposit = _registerBound(address(0xA1), address(0xB1));
+        uint256 plain = _registerBound(address(0xA2), address(0xB2));
+        int256 alpha = 1e16;
+        uint256 base = vm.getBlockTimestamp();
+        uint256 finalTime = base + 40 days;
+
+        vm.prank(address(0xB1));
+        registry.checkpointAlpha(withDeposit, 0);
+        vm.prank(address(0xB2));
+        registry.checkpointAlpha(plain, 0);
+
+        vm.warp(base + 20 days);
+        vm.prank(address(0xB1));
+        registry.checkpointAlpha(withDeposit, alpha / 2);
+
+        vm.warp(finalTime);
+        vm.prank(address(0xB1));
+        registry.checkpointAlpha(withDeposit, alpha);
+        vm.prank(address(0xB2));
+        registry.checkpointAlpha(plain, alpha);
+
+        vm.warp(finalTime);
+        int256 withDepositScore = registry.getAlpha(withDeposit);
+        vm.warp(finalTime);
+        int256 plainScore = registry.getAlpha(plain);
+        assertEq(withDepositScore, plainScore);
+        assertEq(plainScore, alpha - alpha / 4);
+    }
+
+    function test_MidWindowWithdrawalCheckpointDoesNotChangeScore() public {
+        registry.setFactory(factory);
+        uint256 withWithdrawal = _registerBound(address(0xA1), address(0xB1));
+        uint256 plain = _registerBound(address(0xA2), address(0xB2));
+        int256 alpha = 1e16;
+        uint256 base = vm.getBlockTimestamp();
+        uint256 finalTime = base + 40 days;
+
+        vm.prank(address(0xB1));
+        registry.checkpointAlpha(withWithdrawal, 0);
+        vm.prank(address(0xB2));
+        registry.checkpointAlpha(plain, 0);
+
+        vm.warp(base + 20 days);
+        vm.prank(address(0xB1));
+        registry.checkpointAlpha(withWithdrawal, alpha / 2);
+
+        vm.warp(finalTime);
+        vm.prank(address(0xB1));
+        registry.checkpointAlpha(withWithdrawal, alpha);
+        vm.prank(address(0xB2));
+        registry.checkpointAlpha(plain, alpha);
+
+        vm.warp(finalTime);
+        int256 withWithdrawalScore = registry.getAlpha(withWithdrawal);
+        vm.warp(finalTime);
+        int256 plainScore = registry.getAlpha(plain);
+        assertEq(withWithdrawalScore, plainScore);
+        assertEq(plainScore, alpha - alpha / 4);
+    }
+
+    function test_GetAlphaGasIsSublinearInHistoryLength() public {
+        vm.prank(curator);
+        uint256 id = registry.registerStrategy(_env());
+        registry.setFactory(factory);
+        vm.prank(factory);
+        registry.setStrategyVault(id, vault);
+
+        uint256 t = block.timestamp;
+        for (uint256 i = 0; i < 10; i++) {
+            t += 1 hours;
+            vm.warp(t);
+            vm.prank(vault);
+            registry.checkpointAlpha(id, int256(i));
+        }
+        uint256 start = gasleft();
+        registry.getAlpha(id);
+        uint256 shortGas = start - gasleft();
+
+        for (uint256 i = 10; i < registry.MAX_CHECKPOINTS(); i++) {
+            t += 1 hours;
+            vm.warp(t);
+            vm.prank(vault);
+            registry.checkpointAlpha(id, int256(i));
+        }
+        start = gasleft();
+        registry.getAlpha(id);
+        uint256 longGas = start - gasleft();
+
+        assertLt(longGas, shortGas + 50_000, "binary search should not scan the whole ring");
+    }
+
+    function test_LeaderboardPageIsBounded() public {
+        registry.setFactory(factory);
+        for (uint256 i = 0; i < 101; i++) {
+            vm.prank(address(uint160(0xA000 + i)));
+            uint256 id = registry.registerStrategy(_env());
+            vm.prank(factory);
+            registry.setStrategyVault(id, address(uint160(0xB000 + i)));
+        }
+        assertEq(registry.rankedCount(), 101);
+
+        (uint256[] memory first, int256[] memory firstScores) = registry.leaderboard(1000);
+        assertEq(first.length, registry.MAX_LEADERBOARD_PAGE());
+        assertEq(firstScores.length, first.length);
+
+        (uint256[] memory page, int256[] memory pageScores) = registry.leaderboardPage(99, 10);
+        assertEq(page.length, 2);
+        assertEq(pageScores.length, 2);
+        assertEq(page[0], 99);
     }
 
     function test_Leaderboard_OrdersByIntervalAlpha() public {
