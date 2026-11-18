@@ -230,6 +230,7 @@ contract RudderVault is Initializable, ERC20, ReentrancyGuard, IUnlockCallback {
         if (amount0 == 0 && amount1 == 0) revert ZeroAmount();
         if (recipient == address(0)) revert ZeroAmount();
 
+        _clearPriceCache();
         _accrueAlphaInterval();
 
         // Reject deposits priced off a manipulated spot: once the TWAP is live, the spot must stay
@@ -288,6 +289,7 @@ contract RudderVault is Initializable, ERC20, ReentrancyGuard, IUnlockCallback {
         if (userShares < shares) revert InsufficientBalance();
         uint256 supply = totalSupply();
 
+        _clearPriceCache();
         _accrueAlphaInterval();
 
         if (positionLiquidity > 0) _collect();
@@ -356,6 +358,7 @@ contract RudderVault is Initializable, ERC20, ReentrancyGuard, IUnlockCallback {
     {
         Envelope memory env = IStrategyRegistry(registry).getEnvelope(strategyId);
 
+        _clearPriceCache();
         int24 spacing = poolKey.tickSpacing;
         if (spacing <= 0) revert RebalanceOutOfBounds();
         if (newTickLower % spacing != 0 || newTickUpper % spacing != 0) revert TickNotAligned();
@@ -637,6 +640,7 @@ contract RudderVault is Initializable, ERC20, ReentrancyGuard, IUnlockCallback {
         uint256 supply = totalSupply();
         if (supply == 0) return;
         uint160 sqrtP = _twapSqrtPrice();
+        if (_consultFailed()) return;
         uint256 navPerShareNow = _mulDiv(_totalAssetsValue(), 1e18, supply);
         int256 vaultReturn = int256(_mulDiv(navPerShareNow, 1e18, baseNavPerShare)) - int256(1e18);
         int256 holdReturn;
@@ -664,6 +668,7 @@ contract RudderVault is Initializable, ERC20, ReentrancyGuard, IUnlockCallback {
             return;
         }
         uint160 sqrtP = _twapSqrtPrice();
+        if (_consultFailed()) return;
         baseNavPerShare = _mulDiv(_totalAssetsValue(), 1e18, supply);
         baseHold0PerShare = _mulDiv(totalHold.amount0, 1e18, supply);
         baseHold1PerShare = _mulDiv(totalHold.amount1, 1e18, supply);
@@ -676,6 +681,7 @@ contract RudderVault is Initializable, ERC20, ReentrancyGuard, IUnlockCallback {
     {
         if (!IRudderHook(hook).isOracleReady(poolKey)) return (0, 0);
         uint160 sqrtP = _twapSqrtPrice();
+        if (_consultFailed()) return (0, 0);
         uint256 valueOut = LiquidityLib.valueInToken0(total0, total1, sqrtP);
         uint256 holdValue = LiquidityLib.valueInToken0(hb.amount0, hb.amount1, sqrtP);
         if (valueOut == 0 || valueOut <= holdValue) return (0, 0);
@@ -707,11 +713,32 @@ contract RudderVault is Initializable, ERC20, ReentrancyGuard, IUnlockCallback {
             }
             if (cached != 0) return uint160(cached);
         }
-        sqrtPriceX96 = IRudderHook(hook).consult(poolKey, TWAP_WINDOW);
+        try IRudderHook(hook).consult(poolKey, TWAP_WINDOW) returns (uint160 quoted) {
+            sqrtPriceX96 = quoted;
+        } catch {
+            sqrtPriceX96 = _spotSqrtPrice();
+            assembly {
+                tstore(0xDEADBEEF, 1)
+            }
+        }
         if (sqrtPriceX96 == 0) sqrtPriceX96 = _spotSqrtPrice();
         assembly {
             tstore(0, 1)
             tstore(1, sqrtPriceX96)
+        }
+    }
+
+    function _consultFailed() internal view returns (bool failed) {
+        assembly {
+            failed := tload(0xDEADBEEF)
+        }
+    }
+
+    function _clearPriceCache() internal {
+        assembly {
+            tstore(0, 0)
+            tstore(1, 0)
+            tstore(0xDEADBEEF, 0)
         }
     }
 
