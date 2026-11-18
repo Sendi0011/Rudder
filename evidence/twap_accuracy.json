@@ -1,0 +1,12 @@
+{
+  "maxObservedTick": 817,
+  "minObservedTick": -1,
+  "observations": 30,
+  "oracleReady": true,
+  "pushedTick": 817,
+  "spotTick": 817,
+  "sqrtDeviationBps": 67,
+  "startTick": -1,
+  "tickError": 682,
+  "twapTick": 135
+}

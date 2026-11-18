@@ -1,0 +1,11 @@
+{
+  "capacity": 2048,
+  "earlyGas": 9583,
+  "earlyObservations": 2,
+  "lastObservationAge": 1,
+  "lateGas": 17316,
+  "lateObservations": 2048,
+  "maxObservationAge": 3600,
+  "oracleReady": true,
+  "twapWindow": 1800
+}

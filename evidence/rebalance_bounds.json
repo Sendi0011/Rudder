@@ -1,0 +1,16 @@
+{
+  "centerShift": 0,
+  "elapsed": 20,
+  "liquidity": "504106568546075814542247",
+  "lower": -300,
+  "maxCenterShift": 3000,
+  "maxNavLossBps": -5000,
+  "maxPriceImpactBps": 10000,
+  "maxRangeWidth": 6000,
+  "maxTwapDistanceTicks": 6000,
+  "minRebalanceInterval": 1,
+  "navChangeBps": -5,
+  "spotTwapDeviationBps": 0,
+  "upper": 300,
+  "width": 600
+}

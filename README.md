@@ -43,6 +43,24 @@ forge test --via-ir
 `via-ir` is required (the default pipeline reports "Stack too deep" in `RudderVault.withdraw`). A
 faster CI profile is available via `FOUNDRY_PROFILE=ci`.
 
+## Numbers
+
+Local measurements from `FOUNDRY_PROFILE=ci forge test --match-contract EvidenceTest`.
+
+- Oracle lookup gas: **9,583** early and **17,316** at capacity; the ring holds **2,048** observations,
+  the TWAP window is **1,800** seconds, and the freshness bound is **3,600** seconds
+  ([`evidence/oracle_gas.json`](evidence/oracle_gas.json)).
+- TWAP step response: spot moved from tick **-1** to **817** while the **1,800**-second TWAP read
+  **135** after **30** observations, a **682**-tick gap from spot and **67** bps sqrt-price deviation
+  ([`evidence/twap_accuracy.json`](evidence/twap_accuracy.json)).
+- Rebalance mandate: width **600** ticks, centre shift **0** ticks, elapsed **20** seconds since the
+  prior rebalance, and NAV change **-5** bps ([`evidence/rebalance_bounds.json`](evidence/rebalance_bounds.json)).
+- Deposit guard: manipulated spot deviated **109** bps against a **50** bps envelope cap and **50** bps
+  protocol cap before `SpotTwapDeviation` ([`evidence/deposit_guard.json`](evidence/deposit_guard.json)).
+- Ranking invariance: vaults at different sizes accrued the same alpha delta of **2,499,874,729,099,975**
+  with **0** bps relative difference; mid-window deposit and withdrawal each changed alpha by **0**
+  ([`evidence/flow_invariance.json`](evidence/flow_invariance.json)).
+
 Fork test against a live network (skipped when the RPC is unset):
 
 ```
