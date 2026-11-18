@@ -41,6 +41,10 @@ run_with_timeout() {
 }
 
 cleanup() {
+    if [ "${MUTATION_KEEP:-0}" = "1" ]; then
+        echo "$COPY_DIR" >&2
+        return
+    fi
     rm -rf "$COPY_DIR"
 }
 trap cleanup EXIT
@@ -219,7 +223,7 @@ for mutation in "${MUTATIONS[@]}"; do
     log="$COPY_DIR/.mutation-logs/$mutation.log"
     start="$(date +%s)"
     set +e
-    run_with_timeout "$MUTATION_TIMEOUT" "$log" env FOUNDRY_PROFILE=ci FOUNDRY_OPTIMIZER=false FOUNDRY_VIA_IR=true forge test --match-test "$test_name" -q
+    run_with_timeout "$MUTATION_TIMEOUT" "$log" env FOUNDRY_PROFILE=ci FOUNDRY_OPTIMIZER=false FOUNDRY_VIA_IR=true forge test --match-test "$test_name"
     code=$?
     set -e
     duration=$(( $(date +%s) - start ))
@@ -233,6 +237,9 @@ for mutation in "${MUTATIONS[@]}"; do
     fi
 
     printf '| %s | %s | `%s` | %s |\n' "$mutation" "$result" "$test_name" "$duration" >> "$REPORT"
+    if [ "$result" = "survivor" ] && [ -n "${MUTATION_DEBUG_LOG_DIR:-}" ]; then
+        cp "$log" "$MUTATION_DEBUG_LOG_DIR/$mutation.log"
+    fi
     cp "$COPY_DIR/.mutation-backup/$mutation.sol" "$COPY_DIR/$relative_file"
     echo "$mutation $result ${duration}s"
 done
