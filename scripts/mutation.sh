@@ -32,10 +32,8 @@ run_with_timeout() {
     ) &
     local watchdog=$!
 
-    set +e
-    wait "$pid"
-    local code=$?
-    set -e
+    local code=0
+    wait "$pid" || code=$?
     kill "$watchdog" 2>/dev/null || true
     return "$code"
 }
@@ -226,10 +224,8 @@ for mutation in "${MUTATIONS[@]}"; do
         cp "$COPY_DIR/$relative_file" "$MUTATION_DEBUG_LOG_DIR/$mutation.sol"
     fi
     start="$(date +%s)"
-    set +e
     run_with_timeout "$MUTATION_TIMEOUT" "$log" env FOUNDRY_PROFILE=ci FOUNDRY_OPTIMIZER=false FOUNDRY_VIA_IR=true forge test --match-test "$test_name"
     code=$?
-    set -e
     duration=$(( $(date +%s) - start ))
 
     if [ "$code" -eq 124 ] || [ "$code" -eq 137 ]; then
