@@ -50,6 +50,7 @@ cleanup() {
 trap cleanup EXIT
 
 rsync -a --exclude '.git' --exclude 'cache' --exclude 'contracts/out' --exclude 'contracts/cache' "$SOURCE_DIR/" "$COPY_DIR/"
+cd "$COPY_DIR"
 mkdir -p "$COPY_DIR/.mutation-backup" "$COPY_DIR/.mutation-logs"
 
 if [ -n "$ONLY" ] && [ -f "$SOURCE_DIR/evidence/mutation.md" ]; then
