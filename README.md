@@ -24,16 +24,17 @@ contracts/
   script/         deploy, seed and activity scripts
   scripts/        activity loop
   test/           unit, integration, fuzz and stateful invariant tests
-frontend/         (placeholder)
+frontend/         not started
 docs/             architecture, threat model, ADRs, changelog, limitations
 ```
 
 ## Build and test
 
-Requires [Foundry](https://book.getfoundry.sh/) and initialized submodules.
+Requires [Foundry](https://book.getfoundry.sh/) and initialized submodules. `foundry.toml` is at the
+repository root, so run every `forge` command from that directory.
 
 ```sh
-git clone --recurse-submodules <repo> && cd uniswapid/contracts
+git clone --recurse-submodules https://github.com/Sendi0011/Rudder.git && cd Rudder
 forge fmt --check
 forge build --via-ir
 forge test --via-ir
@@ -79,10 +80,27 @@ forge script contracts/script/Seed.s.sol:Seed --rpc-url "$UNICHAIN_SEPOLIA_RPC_U
 ```
 
 `Deploy.s.sol` writes `contracts/deployments.json`; `Seed.s.sol` writes `contracts/seed.json`. Run
+the scripts in this order: Deploy, Seed, at least five Activity runs, then the oracle-ready call
+below. `Seed` initializes the pool at `START_TICK`, seats the three vault ranges and funds them
+before any swap. `Activity` reads the pool and vault state from `contracts/seed.json`, steers price
+back toward the starting tick, and refuses a swap that would leave the narrowest vault range. Use
 `scripts/activity.sh` to send one small swap per loop iteration:
 
 ```sh
 scripts/activity.sh
+```
+
+After the Activity runs, confirm the oracle is ready:
+
+```sh
+HOOK=$(jq -r .rudderHook contracts/deployments.json)
+TOKEN0=$(jq -r .token0 contracts/seed.json)
+TOKEN1=$(jq -r .token1 contracts/seed.json)
+FEE=$(jq -r .fee contracts/seed.json)
+SPACING=$(jq -r .tickSpacing contracts/seed.json)
+
+cast call "$HOOK" 'isOracleReady((address,address,uint24,int24,address)) returns (bool)' \
+  "($TOKEN0,$TOKEN1,$FEE,$SPACING,$HOOK)"
 ```
 
 Verify the deployed contracts with the deployed addresses and constructor arguments:
