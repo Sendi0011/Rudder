@@ -49,7 +49,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-rsync -a --exclude '.git' --exclude 'contracts/out' --exclude 'contracts/cache' "$SOURCE_DIR/" "$COPY_DIR/"
+rsync -a --exclude '.git' --exclude 'cache' --exclude 'contracts/out' --exclude 'contracts/cache' "$SOURCE_DIR/" "$COPY_DIR/"
 mkdir -p "$COPY_DIR/.mutation-backup" "$COPY_DIR/.mutation-logs"
 
 if [ -n "$ONLY" ] && [ -f "$SOURCE_DIR/evidence/mutation.md" ]; then
@@ -221,6 +221,9 @@ for mutation in "${MUTATIONS[@]}"; do
     fi
 
     log="$COPY_DIR/.mutation-logs/$mutation.log"
+    if [ -n "${MUTATION_DEBUG_LOG_DIR:-}" ]; then
+        cp "$COPY_DIR/$relative_file" "$MUTATION_DEBUG_LOG_DIR/$mutation.sol"
+    fi
     start="$(date +%s)"
     set +e
     run_with_timeout "$MUTATION_TIMEOUT" "$log" env FOUNDRY_PROFILE=ci FOUNDRY_OPTIMIZER=false FOUNDRY_VIA_IR=true forge test --match-test "$test_name"
