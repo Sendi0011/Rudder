@@ -191,3 +191,67 @@ performed by these local commands. Development friction and remaining open items
 - [`docs/FEEDBACK.md`](docs/FEEDBACK.md) — Uniswap v4 developer friction encountered while building
 - [`docs/adr/ADR-001-architecture.md`](docs/adr/ADR-001-architecture.md) — architecture decisions
 - [`docs/adr/ADR-002-oracle-and-rebalance-swap.md`](docs/adr/ADR-002-oracle-and-rebalance-swap.md) — oracle and rebalance decisions
+
+## Partner integrations
+
+No partner integrations. There is no partner SDK, adapter, route or partner-specific callback in
+`contracts/src`, `contracts/script` or `frontend/`.
+
+## Built during the hookathon
+
+Listed from `git log` dates since 2026-11-16:
+
+- 2026-11-17: cumulative-tick oracle correction; zero-impact rebalance handling; bounded alpha
+  history and leaderboard; deposit, withdrawal and rebalance invariants; ranking and flow tests;
+  oracle tests under optimization; seed and activity scripts; deployment commands; hookathon
+  orientation; pull request merge `134d7b0`.
+- 2026-11-18: withdrawal independence fix and tests; evidence write permission; bounded invariant
+  handler with action and revert counters; measured operating numbers; review findings; mutation
+  harness and its result table.
+- 2026-11-19: reproducible prior-art search, generated evidence artifacts and prior-art comparison;
+  mutation result publication.
+
+## Credits
+
+- Uniswap v4 core (`v4-core`) and periphery (`v4-periphery`)
+- OpenZeppelin contracts
+- The Uniswap v3 cumulative-price oracle design
+- Atrium Academy UHI Hook Directory (`AtriumAcademy/UHI-Hook-Data`)
+- Uniswap hooklist (`Uniswap/hooklist`)
+
+The reproducible search and neighbor comparison are in [`docs/prior-art.md`](docs/prior-art.md).
+
+| Neighbor | Evidence level | Bounded mechanism | Rudder contrast |
+| --- | --- | --- | --- |
+| Invariant | code read, commit `476778e` | tick bounds and minimum range width | per-vault mandate adds centre shift, interval, TWAP distance and price impact with delayed loosening |
+| CoPool Hook | code read, commit `9bdd059` | token selection, balances and pooled liquidity | per-depositor hold-basis fees and share-based exits are in the Rudder code and tests |
+| TickRangeHook | code read, explorer source | tick lower and upper bounds | Rudder checks width, shift, interval, TWAP distance and price impact |
+| M0 Tick Range Hook | code read, explorer source | tick lower and upper bounds | Rudder checks width, shift, interval, TWAP distance and price impact |
+| CuratedLP | code read, commit `0bcce80` | tick ordering, spacing, interval, fee cap and delegation bounds | Rudder adds hold-basis fees and a flow-invariant alpha ranking |
+| Sentinel v4 | code read, commit `5aa883e` | oracle deviation, yield thresholds and automation width fallback | Rudder ties bounds to a per-vault mandate and timelocked loosening |
+| Ghostbot | code read, commit `0ca2b56` | ticks, cooldown, fee change and signal freshness | Rudder evaluates performance per depositor against a hold basket |
+
+## Known limitations
+
+### Not audited
+
+Rudder has not been audited. The tests and evidence artifacts are local checks, not a security
+review.
+
+## Demo
+
+Demo video: `<placeholder>`
+
+## Deployed addresses
+
+Deployed addresses table: (empty)
+
+| Contract | Address |
+| --- | --- |
+| RudderHook |  |
+| StrategyRegistry |  |
+| RudderVault implementation |  |
+| VaultFactory |  |
+| PoolManager |  |
+| Token0 |  |
+| Token1 |  |
