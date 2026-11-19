@@ -17,9 +17,9 @@ jobs:
         uses: foundry-rs/foundry-toolchain@v1
       - name: Format check
         run: forge fmt --check
+      - name: Check README numbers
+        run: bash scripts/check-docs.sh
       - name: Build
         run: forge build
       - name: Test
         run: forge test -vvv
-      - name: Check README numbers
-        run: bash scripts/check-docs.sh
