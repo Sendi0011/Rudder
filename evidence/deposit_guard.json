@@ -1,0 +1,8 @@
+{
+  "capBps": 50,
+  "deviationBps": 109,
+  "observations": 3,
+  "oracleReady": true,
+  "protocolCapBps": 50,
+  "revertSelector": "SpotTwapDeviation"
+}

@@ -12,7 +12,8 @@ via_ir = true
 fs_permissions = [
     { access = "read", path = "./" },
     { access = "read-write", path = "./contracts/deployments.json" },
-    { access = "read-write", path = "./contracts/seed.json" }
+    { access = "read-write", path = "./contracts/seed.json" },
+    { access = "read-write", path = "./evidence" }
 ]
 [fmt]
 line_length = 120

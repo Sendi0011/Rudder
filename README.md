@@ -24,16 +24,17 @@ contracts/
   script/         deploy, seed and activity scripts
   scripts/        activity loop
   test/           unit, integration, fuzz and stateful invariant tests
-frontend/         (placeholder)
+frontend/         not started
 docs/             architecture, threat model, ADRs, changelog, limitations
 ```
 
 ## Build and test
 
-Requires [Foundry](https://book.getfoundry.sh/) and initialized submodules.
+Requires [Foundry](https://book.getfoundry.sh/) and initialized submodules. `foundry.toml` is at the
+repository root, so run every `forge` command from that directory.
 
 ```sh
-git clone --recurse-submodules <repo> && cd uniswapid/contracts
+git clone --recurse-submodules https://github.com/Sendi0011/Rudder.git && cd Rudder
 forge fmt --check
 forge build --via-ir
 forge test --via-ir
@@ -41,6 +42,24 @@ forge test --via-ir
 
 `via-ir` is required (the default pipeline reports "Stack too deep" in `RudderVault.withdraw`). A
 faster CI profile is available via `FOUNDRY_PROFILE=ci`.
+
+## Numbers
+
+Local measurements from `FOUNDRY_PROFILE=ci forge test --match-contract EvidenceTest`.
+
+- Oracle lookup gas: **9,583** early and **17,316** at capacity; the ring holds **2,048** observations,
+  the TWAP window is **1,800** seconds, and the freshness bound is **3,600** seconds
+  ([`evidence/oracle_gas.json`](evidence/oracle_gas.json)).
+- TWAP step response: spot moved from tick **-1** to **817** while the **1,800**-second TWAP read
+  **135** after **30** observations, a **682**-tick gap from spot and **67** bps sqrt-price deviation
+  ([`evidence/twap_accuracy.json`](evidence/twap_accuracy.json)).
+- Rebalance mandate: width **600** ticks, centre shift **0** ticks, elapsed **20** seconds since the
+  prior rebalance, and NAV change **-5** bps ([`evidence/rebalance_bounds.json`](evidence/rebalance_bounds.json)).
+- Deposit guard: manipulated spot deviated **109** bps against a **50** bps envelope cap and **50** bps
+  protocol cap before `SpotTwapDeviation` ([`evidence/deposit_guard.json`](evidence/deposit_guard.json)).
+- Ranking invariance: vaults at different sizes accrued the same alpha delta of **2,499,874,729,099,975**
+  with **0** bps relative difference; mid-window deposit and withdrawal each changed alpha by **0**
+  ([`evidence/flow_invariance.json`](evidence/flow_invariance.json)).
 
 Fork test against a live network (skipped when the RPC is unset):
 
@@ -79,10 +98,27 @@ forge script contracts/script/Seed.s.sol:Seed --rpc-url "$UNICHAIN_SEPOLIA_RPC_U
 ```
 
 `Deploy.s.sol` writes `contracts/deployments.json`; `Seed.s.sol` writes `contracts/seed.json`. Run
+the scripts in this order: Deploy, Seed, at least five Activity runs, then the oracle-ready call
+below. `Seed` initializes the pool at `START_TICK`, seats the three vault ranges and funds them
+before any swap. `Activity` reads the pool and vault state from `contracts/seed.json`, steers price
+back toward the starting tick, and refuses a swap that would leave the narrowest vault range. Use
 `scripts/activity.sh` to send one small swap per loop iteration:
 
 ```sh
 scripts/activity.sh
+```
+
+After the Activity runs, confirm the oracle is ready:
+
+```sh
+HOOK=$(jq -r .rudderHook contracts/deployments.json)
+TOKEN0=$(jq -r .token0 contracts/seed.json)
+TOKEN1=$(jq -r .token1 contracts/seed.json)
+FEE=$(jq -r .fee contracts/seed.json)
+SPACING=$(jq -r .tickSpacing contracts/seed.json)
+
+cast call "$HOOK" 'isOracleReady((address,address,uint24,int24,address)) returns (bool)' \
+  "($TOKEN0,$TOKEN1,$FEE,$SPACING,$HOOK)"
 ```
 
 Verify the deployed contracts with the deployed addresses and constructor arguments:
@@ -155,3 +191,67 @@ performed by these local commands. Development friction and remaining open items
 - [`docs/FEEDBACK.md`](docs/FEEDBACK.md) — Uniswap v4 developer friction encountered while building
 - [`docs/adr/ADR-001-architecture.md`](docs/adr/ADR-001-architecture.md) — architecture decisions
 - [`docs/adr/ADR-002-oracle-and-rebalance-swap.md`](docs/adr/ADR-002-oracle-and-rebalance-swap.md) — oracle and rebalance decisions
+
+## Partner integrations
+
+No partner integrations. There is no partner SDK, adapter, route or partner-specific callback in
+`contracts/src`, `contracts/script` or `frontend/`.
+
+## Built during the hookathon
+
+Listed from `git log` dates since 2026-11-16:
+
+- 2026-11-17: cumulative-tick oracle correction; zero-impact rebalance handling; bounded alpha
+  history and leaderboard; deposit, withdrawal and rebalance invariants; ranking and flow tests;
+  oracle tests under optimization; seed and activity scripts; deployment commands; hookathon
+  orientation; pull request merge `134d7b0`.
+- 2026-11-18: withdrawal independence fix and tests; evidence write permission; bounded invariant
+  handler with action and revert counters; measured operating numbers; review findings; mutation
+  harness and its result table.
+- 2026-11-19: reproducible prior-art search, generated evidence artifacts and prior-art comparison;
+  mutation result publication.
+
+## Credits
+
+- Uniswap v4 core (`v4-core`) and periphery (`v4-periphery`)
+- OpenZeppelin contracts
+- The Uniswap v3 cumulative-price oracle design
+- Atrium Academy UHI Hook Directory (`AtriumAcademy/UHI-Hook-Data`)
+- Uniswap hooklist (`Uniswap/hooklist`)
+
+The reproducible search and neighbor comparison are in [`docs/prior-art.md`](docs/prior-art.md).
+
+| Neighbor | Evidence level | Bounded mechanism | Rudder contrast |
+| --- | --- | --- | --- |
+| Invariant | code read, commit `476778e` | tick bounds and minimum range width | per-vault mandate adds centre shift, interval, TWAP distance and price impact with delayed loosening |
+| CoPool Hook | code read, commit `9bdd059` | token selection, balances and pooled liquidity | per-depositor hold-basis fees and share-based exits are in the Rudder code and tests |
+| TickRangeHook | code read, explorer source | tick lower and upper bounds | Rudder checks width, shift, interval, TWAP distance and price impact |
+| M0 Tick Range Hook | code read, explorer source | tick lower and upper bounds | Rudder checks width, shift, interval, TWAP distance and price impact |
+| CuratedLP | code read, commit `0bcce80` | tick ordering, spacing, interval, fee cap and delegation bounds | Rudder adds hold-basis fees and a flow-invariant alpha ranking |
+| Sentinel v4 | code read, commit `5aa883e` | oracle deviation, yield thresholds and automation width fallback | Rudder ties bounds to a per-vault mandate and timelocked loosening |
+| Ghostbot | code read, commit `0ca2b56` | ticks, cooldown, fee change and signal freshness | Rudder evaluates performance per depositor against a hold basket |
+
+## Known limitations
+
+### Not audited
+
+Rudder has not been audited. The tests and evidence artifacts are local checks, not a security
+review.
+
+## Demo
+
+Demo video: `<placeholder>`
+
+## Deployed addresses
+
+Deployed addresses table: (empty)
+
+| Contract | Address |
+| --- | --- |
+| RudderHook |  |
+| StrategyRegistry |  |
+| RudderVault implementation |  |
+| VaultFactory |  |
+| PoolManager |  |
+| Token0 |  |
+| Token1 |  |

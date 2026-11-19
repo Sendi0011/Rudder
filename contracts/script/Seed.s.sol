@@ -6,7 +6,6 @@ import {IPoolManager} from "v4-core/interfaces/IPoolManager.sol";
 import {IHooks} from "v4-core/interfaces/IHooks.sol";
 import {PoolKey} from "v4-core/types/PoolKey.sol";
 import {Currency} from "v4-core/types/Currency.sol";
-import {SwapParams} from "v4-core/types/PoolOperation.sol";
 import {TickMath} from "v4-core/libraries/TickMath.sol";
 import {TestERC20} from "v4-core/test/TestERC20.sol";
 import {PoolSwapTest} from "v4-core/test/PoolSwapTest.sol";
@@ -17,11 +16,16 @@ import {RudderVault} from "../src/RudderVault.sol";
 import {Envelope} from "../src/libraries/EnvelopeLib.sol";
 
 contract Seed is Script {
+    error InvalidStartTick();
+
     struct SeedState {
         address token0;
         address token1;
         address router;
         address[3] vaults;
+        uint24 fee;
+        int24 tickSpacing;
+        int24 startingTick;
     }
 
     function run() external returns (SeedState memory s) {
@@ -31,14 +35,27 @@ contract Seed is Script {
         address factoryAddr = vm.parseJsonAddress(deployment, ".vaultFactory");
         address hookAddr = vm.parseJsonAddress(deployment, ".rudderHook");
 
-        address curator = msg.sender;
-        uint256 seedAmount = vm.envOr("SEED_SWAP_AMOUNT", uint256(1e15));
+        vm.startBroadcast();
+        s = _seed(managerAddr, registryAddr, factoryAddr, hookAddr, msg.sender);
+        vm.stopBroadcast();
+
+        _writeSeed(managerAddr, hookAddr, s);
+    }
+
+    function _seed(address managerAddr, address registryAddr, address factoryAddr, address hookAddr, address curator)
+        internal
+        returns (SeedState memory s)
+    {
         uint256 deposit0 = vm.envOr("DEPOSIT0", uint256(100e18));
         uint256 deposit1 = vm.envOr("DEPOSIT1", uint256(100e18));
         uint24 fee = uint24(vm.envOr("POOL_FEE", uint256(3000)));
         int24 spacing = int24(int256(vm.envOr("TICK_SPACING", uint256(60))));
+        int24 startingTick = int24(vm.envOr("START_TICK", int256(0)));
 
-        vm.startBroadcast();
+        if (
+            startingTick % spacing != 0 || startingTick < TickMath.minUsableTick(spacing)
+                || startingTick > TickMath.maxUsableTick(spacing)
+        ) revert InvalidStartTick();
 
         address token0Addr = vm.envOr("TOKEN0", address(0));
         address token1Addr = vm.envOr("TOKEN1", address(0));
@@ -63,15 +80,7 @@ contract Seed is Script {
             tickSpacing: spacing,
             hooks: IHooks(hookAddr)
         });
-        IPoolManager(managerAddr).initialize(key, TickMath.getSqrtPriceAtTick(0));
-        router.swap(
-            key,
-            SwapParams({
-                zeroForOne: true, amountSpecified: -int256(seedAmount), sqrtPriceLimitX96: TickMath.MIN_SQRT_PRICE + 1
-            }),
-            PoolSwapTest.TestSettings({takeClaims: false, settleUsingBurn: false}),
-            ""
-        );
+        IPoolManager(managerAddr).initialize(key, TickMath.getSqrtPriceAtTick(startingTick));
 
         Envelope[3] memory envelopes;
         envelopes[0] = Envelope({
@@ -111,15 +120,15 @@ contract Seed is Script {
             s.vaults[i] = vaultAddr;
         }
 
-        vm.stopBroadcast();
-
         s.token0 = token0Addr;
         s.token1 = token1Addr;
         s.router = address(router);
-        _writeSeed(managerAddr, hookAddr, fee, spacing, s);
+        s.fee = fee;
+        s.tickSpacing = spacing;
+        s.startingTick = startingTick;
     }
 
-    function _writeSeed(address managerAddr, address hookAddr, uint24 fee, int24 spacing, SeedState memory s) internal {
+    function _writeSeed(address managerAddr, address hookAddr, SeedState memory s) internal {
         string memory obj = "seed";
         vm.serializeAddress(obj, "poolManager", managerAddr);
         vm.serializeAddress(obj, "rudderHook", hookAddr);
@@ -129,8 +138,9 @@ contract Seed is Script {
         vm.serializeAddress(obj, "vault0", s.vaults[0]);
         vm.serializeAddress(obj, "vault1", s.vaults[1]);
         vm.serializeAddress(obj, "vault2", s.vaults[2]);
-        vm.serializeUint(obj, "fee", fee);
-        string memory json = vm.serializeUint(obj, "tickSpacing", uint256(int256(spacing)));
+        vm.serializeUint(obj, "fee", s.fee);
+        vm.serializeUint(obj, "tickSpacing", uint256(int256(s.tickSpacing)));
+        string memory json = vm.serializeInt(obj, "startingTick", int256(s.startingTick));
         vm.writeJson(json, "./contracts/seed.json");
     }
 }
