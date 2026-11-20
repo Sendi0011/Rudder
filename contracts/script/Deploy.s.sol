@@ -9,19 +9,23 @@ import {RudderVault} from "../src/RudderVault.sol";
 import {VaultFactory} from "../src/VaultFactory.sol";
 import {RudderHook} from "../src/RudderHook.sol";
 
+interface ICreate2Deployer {
+    function deploy(bytes memory code, bytes32 salt) external returns (address);
+}
+
 /// @title Deploy
-/// @notice Deploys the full Rudder stack. The hook is deployed with CREATE2 (via Foundry's default
-///         deterministic deployment proxy) at an address whose low 14 bits encode the required
+/// @notice Deploys the full Rudder stack. The hook is deployed with CREATE2 through the canonical
+///         deterministic deployment proxy at an address whose low 14 bits encode the required
 ///         permissions (beforeAddLiquidity + beforeSwap). The salt is mined at runtime against the
-///         SAME deployer Foundry uses for `new Hook{salt: ...}`, so the mined address always matches
-///         the deployed address.
+///         same proxy that performs the deployment.
 ///
 /// Usage:
 ///   POOL_MANAGER=0x00b036b58a818b1bc34d502d3fe730db729e62ac \
+///   WRITE_DEPLOYMENTS=1 \
 ///     forge script contracts/script/Deploy.s.sol:Deploy \
 ///     --rpc-url $UNICHAIN_SEPOLIA_RPC_URL --broadcast
 contract Deploy is Script {
-    /// @dev Foundry's default CREATE2 deployer used by `new C{salt: ...}` in scripts.
+    /// @dev Canonical deterministic deployment proxy used by the script directly.
     address internal constant CREATE2_DEPLOYER = 0x4e59b44847b379578588920cA78FbF26c0B4956C;
 
     /// @dev Unichain Sepolia v4 PoolManager (docs.uniswap.org/contracts/v4/deployments, chainId 1301).
@@ -29,6 +33,7 @@ contract Deploy is Script {
 
     error HookAddressMismatch(address expected, address actual);
     error HookOwnerMismatch(address expected, address actual);
+    error Create2DeployerMissing();
 
     struct Deployment {
         address poolManager;
@@ -53,9 +58,11 @@ contract Deploy is Script {
 
         // Permission bits == the bits getHookPermissions() sets to true in RudderHook.
         uint160 flags = uint160(Hooks.BEFORE_ADD_LIQUIDITY_FLAG | Hooks.BEFORE_SWAP_FLAG);
-        (address expectedHook, bytes32 salt) = _mineHook(flags, abi.encode(IPoolManager(d.poolManager), owner));
+        bytes memory hookCode = _hookCode(IPoolManager(d.poolManager), owner);
+        (address expectedHook, bytes32 salt) = _mineHook(flags, hookCode);
+        if (CREATE2_DEPLOYER.code.length == 0) revert Create2DeployerMissing();
 
-        RudderHook hook = new RudderHook{salt: salt}(IPoolManager(d.poolManager), owner);
+        RudderHook hook = RudderHook(ICreate2Deployer(CREATE2_DEPLOYER).deploy(hookCode, salt));
         if (address(hook) != expectedHook) revert HookAddressMismatch(expectedHook, address(hook));
 
         // The factory pins the hook, so the hook is deployed first and bound to the factory after.
@@ -86,10 +93,13 @@ contract Deploy is Script {
         console2.log("hook salt          ", uint256(salt));
     }
 
+    function _hookCode(IPoolManager poolManager, address owner) internal pure returns (bytes memory) {
+        return abi.encodePacked(type(RudderHook).creationCode, abi.encode(poolManager, owner));
+    }
+
     /// @dev Mines a CREATE2 salt against `CREATE2_DEPLOYER` for the given permission flags. Runtime
     ///      mining keeps the salt in lock-step with the actual deployer (never a stale literal).
-    function _mineHook(uint160 flags, bytes memory constructorArgs) internal view returns (address, bytes32) {
-        bytes memory code = abi.encodePacked(type(RudderHook).creationCode, constructorArgs);
+    function _mineHook(uint160 flags, bytes memory code) internal pure returns (address, bytes32) {
         bytes32 codeHash = keccak256(code);
         flags = flags & Hooks.ALL_HOOK_MASK;
 
@@ -105,6 +115,7 @@ contract Deploy is Script {
     }
 
     function _writeDeployments(Deployment memory d) internal {
+        if (vm.envOr("WRITE_DEPLOYMENTS", uint256(0)) == 0) return;
         string memory obj = "rudder";
         vm.serializeUint(obj, "chainId", block.chainid);
         vm.serializeAddress(obj, "poolManager", d.poolManager);
