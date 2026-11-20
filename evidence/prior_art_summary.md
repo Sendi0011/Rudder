@@ -1,6 +1,6 @@
 # Prior-art search
 
-Run date: 2026-11-19
+Run date: 2026-11-20
 
 ## Datasets
 
@@ -29,4 +29,3 @@ Total entries searched: 6030
 
 - performance_fee_hwm: reproduced=true; none of the directory entries searched mention a performance fee or high-water mark.
 - curator_entry_count: reproduced=true; curator appears in two directory entries, Gainswap and PumpUp.
-- curator_not_lp_management: reproduced=false; neither curator entry is about LP management.
