@@ -388,8 +388,6 @@ contract RudderVault is Initializable, ERC20, ReentrancyGuard, IUnlockCallback {
 
         EnvelopeLib.validatePriceImpact(_priceImpactBps(spot, twap), env.maxPriceImpactBps);
 
-        _accrueAlphaInterval();
-
         if (positionLiquidity > 0) _collect();
         uint256 preNav = _totalAssetsValue();
 
@@ -446,6 +444,10 @@ contract RudderVault is Initializable, ERC20, ReentrancyGuard, IUnlockCallback {
 
         uint256 postNav = _totalAssetsValue();
         EnvelopeLib.validateNavLoss(_navLossBps(preNav, postNav), env.maxNavLossBps);
+
+        // Deposits and withdrawals accrue before their funds move; a rebalance accrues after the
+        // swap so its realized cost is charged to alpha instead of being erased by the rebase.
+        _accrueAlphaInterval();
 
         lastRebalanceTimestamp = uint48(block.timestamp);
         _rebaseAlphaBaseline();
@@ -629,9 +631,10 @@ contract RudderVault is Initializable, ERC20, ReentrancyGuard, IUnlockCallback {
         return LiquidityLib.getAmountsForLiquidity(sqrtP, sqrtA, sqrtB, positionLiquidity);
     }
 
-    /// @dev Accrues the alpha earned since the last baseline, BEFORE the current action changes any
-    ///      balances. Alpha is the vault's per-share return minus the return of simply holding the
-    ///      baseline basket, both valued at TWAP and expressed as 1e18-scaled fractions. The interval
+    /// @dev Accrues the alpha earned since the last baseline. Deposit and withdraw call before their
+    ///      flows; rebalance calls after its swap so the realized cost is included. Alpha is the
+    ///      vault's per-share return minus the return of simply holding the baseline basket, both
+    ///      valued at TWAP and expressed as 1e18-scaled fractions. The interval
     ///      is added to a running accumulator so the registry ranks dimensionless scores. Skipped until
     ///      a baseline exists (first action) or while the oracle is not ready.
     function _accrueAlphaInterval() internal {
