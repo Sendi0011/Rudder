@@ -222,6 +222,11 @@ contract VaultInvariantsTest is RudderIntegrationBase {
         targetSelector(FuzzSelector({addr: address(handler), selectors: sels}));
     }
 
+    function _writeEvidence(string memory json, string memory path) internal {
+        if (vm.envOr("WRITE_EVIDENCE", uint256(0)) == 0) return;
+        vm.writeJson(json, path);
+    }
+
     function _writeRunEvidence(uint256 attempts, uint256 reverts) internal {
         uint256 runs = vm.envOr("FOUNDRY_INVARIANT_RUNS", uint256(32));
         uint256 depth = vm.envOr("FOUNDRY_INVARIANT_DEPTH", uint256(32));
@@ -241,7 +246,7 @@ contract VaultInvariantsTest is RudderIntegrationBase {
         vm.serializeUint(obj, "attempts", attempts);
         vm.serializeUint(obj, "reverts", reverts);
         string memory json = vm.serializeUint(obj, "revertRateBps", attempts == 0 ? 0 : (reverts * 10_000) / attempts);
-        vm.writeJson(json, "evidence/invariant_runs.json");
+        _writeEvidence(json, "evidence/invariant_runs.json");
     }
 
     function invariant_ShareConservation() public view {

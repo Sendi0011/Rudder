@@ -42,6 +42,11 @@ contract EvidenceTest is RudderIntegrationBase {
         (, tick,,) = IPoolManager(address(manager)).getSlot0(pool.toId());
     }
 
+    function _writeEvidence(string memory json, string memory path) internal {
+        if (vm.envOr("WRITE_EVIDENCE", uint256(0)) == 0) return;
+        vm.writeJson(json, path);
+    }
+
     function _consultGas() internal view returns (uint256 gasUsed) {
         uint256 start = gasleft();
         hook.consult(key, hook.TWAP_WINDOW());
@@ -117,7 +122,7 @@ contract EvidenceTest is RudderIntegrationBase {
         vm.serializeUint(obj, "maxObservationAge", hook.MAX_OBSERVATION_AGE());
         vm.serializeUint(obj, "lastObservationAge", block.timestamp - lastTs);
         string memory json = vm.serializeBool(obj, "oracleReady", hook.isOracleReady(key));
-        vm.writeJson(json, "evidence/oracle_gas.json");
+        _writeEvidence(json, "evidence/oracle_gas.json");
 
         assertEq(hook.observationCount(key), capacity, "ring must reach capacity");
         assertTrue(hook.isOracleReady(key), "oracle must stay ready");
@@ -170,7 +175,7 @@ contract EvidenceTest is RudderIntegrationBase {
         vm.serializeUint(obj, "sqrtDeviationBps", _deviationBps(_sqrtPrice(), twapSqrt));
         vm.serializeUint(obj, "observations", hook.observationCount(pool));
         string memory json = vm.serializeBool(obj, "oracleReady", hook.isOracleReady(pool));
-        vm.writeJson(json, "evidence/twap_accuracy.json");
+        _writeEvidence(json, "evidence/twap_accuracy.json");
 
         assertGe(twapTick, minTick, "twap below observed ticks");
         assertLe(twapTick, maxTick, "twap above observed ticks");
@@ -210,7 +215,7 @@ contract EvidenceTest is RudderIntegrationBase {
         vm.serializeUint(obj, "minRebalanceInterval", env.minRebalanceInterval);
         vm.serializeUint(obj, "maxPriceImpactBps", env.maxPriceImpactBps);
         string memory json = vm.serializeUint(obj, "liquidity", vault.positionLiquidity());
-        vm.writeJson(json, "evidence/rebalance_bounds.json");
+        _writeEvidence(json, "evidence/rebalance_bounds.json");
 
         assertLe(uint256(int256(vault.tickUpper() - vault.tickLower())), uint256(int256(env.maxRangeWidth)));
         assertLe(_abs(int256(newCenter) - int256(oldCenter)), uint256(int256(env.maxCenterShift)));
@@ -241,7 +246,7 @@ contract EvidenceTest is RudderIntegrationBase {
         vm.serializeUint(obj, "observations", hook.observationCount(key));
         vm.serializeBool(obj, "oracleReady", hook.isOracleReady(key));
         string memory json = vm.serializeString(obj, "revertSelector", "SpotTwapDeviation");
-        vm.writeJson(json, "evidence/deposit_guard.json");
+        _writeEvidence(json, "evidence/deposit_guard.json");
 
         assertGt(deviation, cap, "spot must deviate beyond the cap");
         _fundVault(v, alice, BIG, BIG);
@@ -310,7 +315,7 @@ contract EvidenceTest is RudderIntegrationBase {
         vm.serializeInt(obj, "alphaAfterWithdraw", afterWithdraw);
         vm.serializeInt(obj, "depositAlphaDelta", afterDeposit - beforeFlows);
         string memory json = vm.serializeInt(obj, "withdrawAlphaDelta", afterWithdraw - afterDeposit);
-        vm.writeJson(json, "evidence/flow_invariance.json");
+        _writeEvidence(json, "evidence/flow_invariance.json");
 
         assertGt(bigDelta, 0, "large vault must accrue alpha");
         assertGt(smallDelta, 0, "small vault must accrue alpha");
@@ -361,7 +366,7 @@ contract EvidenceTest is RudderIntegrationBase {
         vm.serializeUint(obj, "alphaCostBps", alphaCostBps);
         vm.serializeInt(obj, "alphaCostWei", alphaCost);
         string memory json = vm.serializeBool(obj, "holdBasketUnchanged", holdUnchanged);
-        vm.writeJson(json, "evidence/rebalance_alpha_cost.json");
+        _writeEvidence(json, "evidence/rebalance_alpha_cost.json");
 
         assertTrue(holdUnchanged, "rebalance must not change the hold basket");
         assertGt(alphaCost, 0, "rebalance cost must reduce alpha");
@@ -412,7 +417,7 @@ contract EvidenceTest is RudderIntegrationBase {
         vm.serializeUint(churnObj, "summedCostBps", summedCostBps);
         vm.serializeUint(churnObj, "rankingGapBps", rankingGapBps);
         string memory churnJson = vm.serializeInt(churnObj, "rankingGapWei", gap);
-        vm.writeJson(churnJson, "evidence/churner_alpha.json");
+        _writeEvidence(churnJson, "evidence/churner_alpha.json");
 
         assertGt(gap, 0, "churner must rank below the static vault");
         assertApproxEqRel(uint256(gap), summedCost, 0.4e18, "ranking gap must match summed cost");
