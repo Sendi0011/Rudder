@@ -24,18 +24,20 @@ run_with_timeout() {
     local log="$2"
     shift 2
 
-    "$@" > "$log" 2>&1 &
-    local pid=$!
-    (
-        sleep "$seconds"
-        kill -9 "$pid" 2>/dev/null || true
-    ) &
-    local watchdog=$!
+    python3 - "$seconds" "$log" "$@" <<'PY'
+import subprocess
+import sys
 
-    local code=0
-    wait "$pid" || code=$?
-    kill "$watchdog" 2>/dev/null || true
-    return "$code"
+seconds = float(sys.argv[1])
+log = sys.argv[2]
+cmd = sys.argv[3:]
+with open(log, "w") as handle:
+    try:
+        code = subprocess.run(cmd, stdout=handle, stderr=subprocess.STDOUT, timeout=seconds).returncode
+    except subprocess.TimeoutExpired:
+        code = 124
+raise SystemExit(code)
+PY
 }
 
 cleanup() {
@@ -47,7 +49,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-rsync -a --exclude '.git' --exclude 'cache' --exclude 'contracts/out' --exclude 'contracts/cache' "$SOURCE_DIR/" "$COPY_DIR/"
+rsync -a --exclude '.git' --exclude 'cache' "$SOURCE_DIR/" "$COPY_DIR/"
 cd "$COPY_DIR"
 mkdir -p "$COPY_DIR/.mutation-backup" "$COPY_DIR/.mutation-logs"
 
@@ -73,6 +75,14 @@ MUTATIONS=(
     hold_basket_on_transfer
     deposit_deviation_guard
     oracle_tick_time_factor
+    vault_range_width_call
+    vault_twap_distance_call
+    vault_interval_call
+    vault_center_shift_call
+    vault_price_impact_pre_call
+    vault_price_impact_post_call
+    vault_nav_loss_call
+    vault_alpha_cost_call
 )
 
 TESTS=(
@@ -91,6 +101,14 @@ TESTS=(
     test_TransferMovesCostBasis
     test_DepositRejectedWhenSpotDeviatesFromTwap
     test_ConstantTickHeldThirtyMinutesPositive
+    test_RevertOnRangeWidth
+    test_RebalanceRejectedWhenCenterTooFarFromTwap
+    test_RevertOnInterval
+    test_RevertOnCenterShift
+    test_RevertOnPriceImpact
+    test_RebalanceStopsAtPriceLimitAndLeavesResidual
+    test_RevertOnNavLoss
+    test_CostlyRebalanceChargesAlphaForNavLoss
 )
 
 find_test() {
@@ -192,6 +210,50 @@ patches = {
         "contracts/src/RudderHook.sol",
         """            tickCumulative = last.tickCumulative + int56(tick) * int56(uint56(block.timestamp - last.timestamp));""",
         """            tickCumulative = last.tickCumulative + int56(tick);""",
+    ),
+    "vault_range_width_call": (
+        "contracts/src/RudderVault.sol",
+        """        EnvelopeLib.validateRangeWidth(width, env.maxRangeWidth);""",
+        """        {}""",
+    ),
+    "vault_twap_distance_call": (
+        "contracts/src/RudderVault.sol",
+        """        EnvelopeLib.validateTwapDistance(newCenter, TickMath.getTickAtSqrtPrice(twap), env.maxTwapDistanceTicks);""",
+        """        {}""",
+    ),
+    "vault_interval_call": (
+        "contracts/src/RudderVault.sol",
+        """            EnvelopeLib.validateInterval(
+                uint48(lastRebalanceTimestamp), uint48(block.timestamp), env.minRebalanceInterval
+            );""",
+        """            {}""",
+    ),
+    "vault_center_shift_call": (
+        "contracts/src/RudderVault.sol",
+        """            EnvelopeLib.validateCenterShift(newCenter - oldCenter, env.maxCenterShift);""",
+        """            {}""",
+    ),
+    "vault_price_impact_pre_call": (
+        "contracts/src/RudderVault.sol",
+        """        EnvelopeLib.validatePriceImpact(_priceImpactBps(spot, twap), env.maxPriceImpactBps);""",
+        """        revert("PRE_IMPACT");""",
+    ),
+    "vault_price_impact_post_call": (
+        "contracts/src/RudderVault.sol",
+        """        EnvelopeLib.validatePriceImpact(_priceImpactBps(_spotSqrtPrice(), twap), env.maxPriceImpactBps);""",
+        """        revert("POST_IMPACT");""",
+    ),
+    "vault_nav_loss_call": (
+        "contracts/src/RudderVault.sol",
+        """        EnvelopeLib.validateNavLoss(_navLossBps(preNav, postNav), env.maxNavLossBps);""",
+        """        {}""",
+    ),
+    "vault_alpha_cost_call": (
+        "contracts/src/RudderVault.sol",
+        """        _accrueAlphaInterval();
+
+        lastRebalanceTimestamp = uint48(block.timestamp);""",
+        """        lastRebalanceTimestamp = uint48(block.timestamp);""",
     ),
 }
 
