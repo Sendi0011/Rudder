@@ -186,6 +186,10 @@ performed by these local commands. Development friction and remaining open items
 
 ## Documentation
 
+- [`docs/MANDATE.md`](docs/MANDATE.md) — scope and exclusions
+- [`docs/CLAIMS.md`](docs/CLAIMS.md) — claims linked to artifacts and commands
+- [`docs/EVIDENCE.md`](docs/EVIDENCE.md) — artifact reproduction
+- [`docs/DEPLOYMENTS.md`](docs/DEPLOYMENTS.md) — deployment state and checks
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — components and invariants
 - [`docs/DEMO.md`](docs/DEMO.md) — reviewer walkthrough
 - [`docs/THREAT_MODEL.md`](docs/THREAT_MODEL.md) — threats, vectors, mitigations

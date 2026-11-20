@@ -19,7 +19,11 @@ jobs:
         run: forge fmt --check
       - name: Check README numbers
         run: bash scripts/check-docs.sh
+      - name: Check claims
+        run: bash scripts/check-claims.sh
       - name: Build
         run: forge build
       - name: Test
         run: forge test -vvv
+      - name: Check evidence artifacts
+        run: git diff --exit-code -- evidence contracts/deployments.json
