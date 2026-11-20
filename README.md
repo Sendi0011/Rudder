@@ -47,7 +47,7 @@ faster CI profile is available via `FOUNDRY_PROFILE=ci`.
 
 Local measurements from `FOUNDRY_PROFILE=ci forge test --match-contract EvidenceTest`.
 
-- Oracle lookup gas: **9,583** early and **17,316** at capacity; the ring holds **2,048** observations,
+- Oracle lookup gas: **26,509** early and **56,531** at capacity; the ring holds **2,048** observations,
   the TWAP window is **1,800** seconds, and the freshness bound is **3,600** seconds
   ([`evidence/oracle_gas.json`](evidence/oracle_gas.json)).
 - TWAP step response: spot moved from tick **-1** to **817** while the **1,800**-second TWAP read
@@ -60,6 +60,10 @@ Local measurements from `FOUNDRY_PROFILE=ci forge test --match-contract Evidence
 - Ranking invariance: vaults at different sizes accrued the same alpha delta of **2,499,874,729,099,975**
   with **0** bps relative difference; mid-window deposit and withdrawal each changed alpha by **0**
   ([`evidence/flow_invariance.json`](evidence/flow_invariance.json)).
+- Rebalance cost: NAV fell **15** bps and alpha fell **15** bps; the hold basket stayed unchanged
+  ([`evidence/rebalance_alpha_cost.json`](evidence/rebalance_alpha_cost.json)).
+- Churn ranking: across **3** rebalances the ranking gap was **200** bps against **249** bps summed cost
+  ([`evidence/churner_alpha.json`](evidence/churner_alpha.json)).
 
 Fork test against a live network (skipped when the RPC is unset):
 

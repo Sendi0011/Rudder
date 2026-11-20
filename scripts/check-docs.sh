@@ -51,6 +51,15 @@ fields = {
         ["flow_invariance.json:relativeDifferenceBps"],
         ["flow_invariance.json:depositAlphaDelta", "flow_invariance.json:withdrawAlphaDelta"],
     ],
+    "rebalance_alpha_cost.json": [
+        ["rebalance_alpha_cost.json:navLossBps"],
+        ["rebalance_alpha_cost.json:alphaCostBps"],
+    ],
+    "churner_alpha.json": [
+        ["churner_alpha.json:rebalanceCount"],
+        ["churner_alpha.json:rankingGapBps"],
+        ["churner_alpha.json:summedCostBps"],
+    ],
 }
 
 lines = readme.read_text(encoding="utf-8").splitlines()
