@@ -8,7 +8,7 @@ tests with an explicit write switch. A normal `forge test` run does not write th
 ```sh
 WRITE_EVIDENCE=1 FOUNDRY_PROFILE=ci forge test --match-contract EvidenceTest
 WRITE_EVIDENCE=1 FOUNDRY_PROFILE=ci forge test --match-contract WorstCaseBoundTest
-env FOUNDRY_OPTIMIZER=false FOUNDRY_VIA_IR=true WRITE_EVIDENCE=1 forge test --match-contract PlaceboCuratorsTest -vv
+env FOUNDRY_OPTIMIZER=false FOUNDRY_VIA_IR=true WRITE_EVIDENCE=1 forge test --match-contract PlaceboCuratorsTest --block-gas-limit 20000000000 -vv
 WRITE_EVIDENCE=1 FOUNDRY_PROFILE=ci forge test --match-contract VaultInvariantsTest
 ```
 
@@ -50,9 +50,23 @@ tier keeps a residual floor above zero; the two faster tiers can reach the full 
 under repeated maximum-loss rebalances.
 
 The [`placebo_curators.json`](../evidence/placebo_curators.json) sample uses fixed seeds, exact-input
-swaps and shared local pools. It compares reactive, static and random curators on the same price
-paths. The reactive mean sits just above the placebo mean, so the result is reported as a narrow
-margin. This is a local stress comparison, not an estimate of live execution or fee income.
+swaps and shared local pools. `K` defaults to 30 placebos per cell and can be overridden in the
+environment, giving 180 placebo runs across six scenarios. Every vault is checkpointed with
+`pokeAlpha()` after each price step, so a static or non-rebalancing curator still accrues alpha over
+the same intervals. The static mean stays at zero because that position matches its hold basket.
+
+| Statistic | Value |
+| --- | --- |
+| Reactive mean | -16 bps |
+| Static mean | 0 bps |
+| Placebo mean | -12 bps |
+| Placebo standard deviation | 35 bps |
+| Reactive z-score | -11 × 100 |
+
+`reactiveVsPlaceboZScoreTimes100` is `(reactive mean − placebo mean) × 100 / placebo std`, stored as
+an integer. The reactive mean sits below the placebo mean by about 0.11 standard deviations, so no
+curator edge is claimed. This is a local stress comparison, not an estimate of live execution or fee
+income.
 
 ## Other artifacts
 

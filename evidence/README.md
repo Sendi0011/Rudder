@@ -19,5 +19,5 @@ Normal test runs leave these files unchanged.
 - `rebalance_alpha_cost.json` — NAV and alpha loss from a measured rebalance.
 - `churner_alpha.json` — ranking gap against summed rebalance cost.
 - `worst_case_loss.json` — compounded envelope bound, observed rebalance loss and seeded 24-hour tiers.
-- `placebo_curators.json` — reactive, static and random curator alpha distribution.
+- `placebo_curators.json` — reactive, static and random curator alpha distribution with K and z-score.
 - `invariant_runs.json` — invariant run settings and handler revert rate.

@@ -21,6 +21,7 @@ contract PlaceboCuratorsTest is RudderIntegrationBase {
     uint256 internal constant DEPTH = 100_000e18;
     uint256 internal constant STEPS = 8;
     uint256 internal constant SCENARIOS = 6;
+    int256 internal constant Z_SCORE_SCALE = 100;
 
     int256[] internal placeboAlphas;
     int256[SCENARIOS] internal reactiveAlphas;
@@ -32,8 +33,8 @@ contract PlaceboCuratorsTest is RudderIntegrationBase {
     uint256 internal maxDrawdownBps;
 
     function test_PlaceboCuratorDistribution() public {
-        uint256 k = vm.envOr("K", uint256(4));
-        require(k > 0 && k <= 8, "K must be between 1 and 8");
+        uint256 k = vm.envOr("K", uint256(30));
+        require(k > 0 && k <= 30, "K must be between 1 and 30");
 
         Envelope memory conservative = Envelope({
             maxRangeWidth: 600,
@@ -61,14 +62,18 @@ contract PlaceboCuratorsTest is RudderIntegrationBase {
         (int256 pMean, uint256 pStd, int256 pMin, int256 pMax, int256 p25, int256 p50, int256 p75) =
             _stats(placeboAlphas);
         bool reactiveWins = reactiveMean > pMean;
+        int256 zScoreTimes100 = pStd == 0 ? int256(0) : ((reactiveMean - pMean) * Z_SCORE_SCALE) / int256(pStd);
 
         string memory obj = "placeboCurators";
         vm.serializeUint(obj, "k", k);
+        vm.serializeUint(obj, "placeboSamples", placeboAlphas.length);
         vm.serializeUint(obj, "regimes", uint256(3));
         vm.serializeUint(obj, "envelopes", uint256(2));
         vm.serializeInt(obj, "reactiveMeanBps", reactiveMean);
         vm.serializeInt(obj, "staticMeanBps", staticMean);
         vm.serializeInt(obj, "placeboMeanBps", pMean);
+        vm.serializeUint(obj, "zScoreScale", uint256(Z_SCORE_SCALE));
+        vm.serializeInt(obj, "reactiveVsPlaceboZScoreTimes100", zScoreTimes100);
         vm.serializeUint(obj, "placeboStdBps", pStd);
         vm.serializeInt(obj, "placeboMinBps", pMin);
         vm.serializeInt(obj, "placeboMaxBps", pMax);
@@ -133,6 +138,12 @@ contract PlaceboCuratorsTest is RudderIntegrationBase {
             uint256 amount = regime == 2 && step == 3 ? 20e18 : 5e18;
             _swapOn(pool, direction, amount);
             vm.warp(block.timestamp + env.minRebalanceInterval);
+
+            staticVault.pokeAlpha();
+            reactiveVault.pokeAlpha();
+            for (uint256 i = 0; i < k; i++) {
+                placebos[i].pokeAlpha();
+            }
 
             int24 center = _reactiveCenter(reactiveVault, pool, env, regime, step, direction);
             _tryRebalance(reactiveVault, pool, center);

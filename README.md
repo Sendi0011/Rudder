@@ -73,9 +73,10 @@ Local measurements from `FOUNDRY_PROFILE=ci forge test --match-contract Evidence
   **1,800** seconds and **500** bps at **600** seconds allow **3,975**, **9,197** and **10,000** bps
   across **25**, **49** and **145** rebalances
   ([`evidence/worst_case_loss.json`](evidence/worst_case_loss.json)). <!-- claim:RUD-029 -->
-- Curator sample: **4** random curators over **3** regimes and **2** envelopes saw a **-5** bps reactive
-  mean against a **-7** bps placebo mean with **34** bps dispersion; worst loss was **77** bps against
-  a **9,981** bps bound and **183** bps drawdown
+- Curator sample: **30** random curators per cell (**180** placebo samples) over **3** regimes and **2**
+  envelopes saw a **-16** bps reactive mean, **0** bps static mean and **-12** bps placebo mean, with
+  **35** bps dispersion, a z-score scaled by **100** of **-11**, worst loss **90** bps against a
+  **3,701** bps bound and **284** bps drawdown
   ([`evidence/placebo_curators.json`](evidence/placebo_curators.json)). <!-- claim:RUD-030 -->
 
 Fork test against a live network (skipped when the RPC is unset): <!-- claim:RUD-014 -->
