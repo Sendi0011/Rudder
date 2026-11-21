@@ -69,6 +69,17 @@ fields = {
         ["worst_case_loss.json:observedLossBps"],
         ["worst_case_loss.json:chargedRebalances"],
     ],
+    "placebo_curators.json": [
+        ["placebo_curators.json:k"],
+        ["placebo_curators.json:regimes"],
+        ["placebo_curators.json:envelopes"],
+        ["placebo_curators.json:reactiveMeanBps"],
+        ["placebo_curators.json:placeboMeanBps"],
+        ["placebo_curators.json:placeboStdBps"],
+        ["placebo_curators.json:worstRebalanceLossBps"],
+        ["placebo_curators.json:lossBoundBps"],
+        ["placebo_curators.json:maxDrawdownVsHoldBps"],
+    ],
 }
 
 lines = readme.read_text(encoding="utf-8").splitlines()

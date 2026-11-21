@@ -68,6 +68,11 @@ Local measurements from `FOUNDRY_PROFILE=ci forge test --match-contract Evidence
   **1,856** bps across **4** rebalances; measured loss was **73** bps across **3** charged rebalances
   ([`evidence/worst_case_loss.json`](evidence/worst_case_loss.json)).
 
+- Curator sample: **4** random curators over **3** regimes and **2** envelopes saw a **-5** bps reactive
+  mean against a **-7** bps placebo mean with **34** bps dispersion; worst loss was **77** bps against
+  a **9,981** bps bound and **183** bps drawdown
+  ([`evidence/placebo_curators.json`](evidence/placebo_curators.json)).
+
 Fork test against a live network (skipped when the RPC is unset):
 
 ```

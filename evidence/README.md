@@ -4,6 +4,8 @@ Regenerate the measurement artifacts with:
 
 ```sh
 WRITE_EVIDENCE=1 FOUNDRY_PROFILE=ci forge test --match-contract EvidenceTest
+WRITE_EVIDENCE=1 FOUNDRY_PROFILE=ci forge test --match-contract WorstCaseBoundTest
+env FOUNDRY_OPTIMIZER=false FOUNDRY_VIA_IR=true WRITE_EVIDENCE=1 forge test --match-contract PlaceboCuratorsTest -vv
 WRITE_EVIDENCE=1 FOUNDRY_PROFILE=ci forge test --match-contract VaultInvariantsTest
 ```
 
@@ -16,4 +18,6 @@ Normal test runs leave these files unchanged.
 - `flow_invariance.json` — alpha under size changes and mid-window flows.
 - `rebalance_alpha_cost.json` — NAV and alpha loss from a measured rebalance.
 - `churner_alpha.json` — ranking gap against summed rebalance cost.
+- `worst_case_loss.json` — compounded envelope bound against observed rebalance loss.
+- `placebo_curators.json` — reactive, static and random curator alpha distribution.
 - `invariant_runs.json` — invariant run settings and handler revert rate.

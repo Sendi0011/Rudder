@@ -8,6 +8,7 @@ tests with an explicit write switch. A normal `forge test` run does not write th
 ```sh
 WRITE_EVIDENCE=1 FOUNDRY_PROFILE=ci forge test --match-contract EvidenceTest
 WRITE_EVIDENCE=1 FOUNDRY_PROFILE=ci forge test --match-contract WorstCaseBoundTest
+env FOUNDRY_OPTIMIZER=false FOUNDRY_VIA_IR=true WRITE_EVIDENCE=1 forge test --match-contract PlaceboCuratorsTest -vv
 WRITE_EVIDENCE=1 FOUNDRY_PROFILE=ci forge test --match-contract VaultInvariantsTest
 ```
 
@@ -21,6 +22,7 @@ WRITE_EVIDENCE=1 FOUNDRY_PROFILE=ci forge test --match-contract VaultInvariantsT
 | `rebalance_alpha_cost.json` | `test_RebalanceCostEvidence` | NAV and alpha loss from a rebalance |
 | `churner_alpha.json` | `test_RebalanceCostEvidence` | Ranking gap against summed rebalance cost |
 | `worst_case_loss.json` | `test_WorstCaseBoundCoversObservedRebalanceLosses` | Compounded envelope bound against observed rebalance loss |
+| `placebo_curators.json` | `test_PlaceboCuratorDistribution` | Reactive, static and random curator alpha distribution |
 | `invariant_runs.json` | `invariant_ActionsExecuted` | Invariant run settings and action counters |
 
 The `rankingGapBps` and `summedCostBps` fields in
@@ -34,6 +36,11 @@ The bound in [`worst_case_loss.json`](../evidence/worst_case_loss.json) compound
 NAV-loss floor over the interval-spaced horizon described in
 [`MANDATE.md:16-31`](MANDATE.md). It measures accounting loss from rebalancing, not market-price
 drawdown.
+
+The [`placebo_curators.json`](../evidence/placebo_curators.json) sample uses fixed seeds, exact-input
+swaps and shared local pools. It compares reactive, static and random curators on the same price
+paths. The reactive mean sits just above the placebo mean, so the result is reported as a narrow
+margin. This is a local stress comparison, not an estimate of live execution or fee income.
 
 ## Other artifacts
 
