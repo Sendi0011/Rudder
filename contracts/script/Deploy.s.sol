@@ -9,10 +9,6 @@ import {RudderVault} from "../src/RudderVault.sol";
 import {VaultFactory} from "../src/VaultFactory.sol";
 import {RudderHook} from "../src/RudderHook.sol";
 
-interface ICreate2Deployer {
-    function deploy(bytes memory code, bytes32 salt) external returns (address);
-}
-
 /// @title Deploy
 /// @notice Deploys the full Rudder stack. The hook is deployed with CREATE2 through the canonical
 ///         deterministic deployment proxy at an address whose low 14 bits encode the required
@@ -34,6 +30,7 @@ contract Deploy is Script {
     error HookAddressMismatch(address expected, address actual);
     error HookOwnerMismatch(address expected, address actual);
     error Create2DeployerMissing();
+    error Create2CallFailed();
 
     struct Deployment {
         address poolManager;
@@ -62,7 +59,9 @@ contract Deploy is Script {
         (address expectedHook, bytes32 salt) = _mineHook(flags, hookCode);
         if (CREATE2_DEPLOYER.code.length == 0) revert Create2DeployerMissing();
 
-        RudderHook hook = RudderHook(ICreate2Deployer(CREATE2_DEPLOYER).deploy(hookCode, salt));
+        (bool ok, bytes memory ret) = CREATE2_DEPLOYER.call(abi.encodePacked(salt, hookCode));
+        require(ok && ret.length == 20, Create2CallFailed());
+        RudderHook hook = RudderHook(address(bytes20(ret)));
         if (address(hook) != expectedHook) revert HookAddressMismatch(expectedHook, address(hook));
 
         // The factory pins the hook, so the hook is deployed first and bound to the factory after.
