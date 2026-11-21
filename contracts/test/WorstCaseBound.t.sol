@@ -26,18 +26,19 @@ contract WorstCaseBoundTest is RudderIntegrationBase {
         RudderVault v = _createVault(env);
         _seed(v, alice, -600, 600, DEPOSIT);
         _depthVault(env);
-        _readyOracle();
+        uint256 ts = _readyOracle(block.timestamp);
 
         _fundVault(v, bob, 1e18, 1e18);
         vm.prank(bob);
         v.deposit(1e18, 1e18, bob);
 
-        uint256 bootstrap = block.timestamp;
+        uint256 bootstrap = ts;
         uint256 surviving = 10_000;
         for (uint256 i = 0; i < CHARGED_REBALANCES; i++) {
             bool zeroForOne = i % 2 == 0;
             _swap(zeroForOne, 5e18);
-            vm.warp(block.timestamp + INTERVAL);
+            ts += INTERVAL;
+            vm.warp(ts);
             int24 lo = zeroForOne ? int24(-1200) : int24(600);
             int24 hi = zeroForOne ? int24(-600) : int24(1200);
             uint256 pre = v.totalAssetsValue();
@@ -49,7 +50,7 @@ contract WorstCaseBoundTest is RudderIntegrationBase {
             assertLe(loss, LOSS_CAP_BPS, "rebalance loss must respect the envelope floor");
         }
 
-        uint256 elapsed = block.timestamp - bootstrap;
+        uint256 elapsed = ts - bootstrap;
         uint256 boundCount = elapsed / INTERVAL + 1;
         uint256 bound = _boundBps(LOSS_CAP_BPS, boundCount);
         uint256 observed = 10_000 - surviving;
@@ -95,11 +96,14 @@ contract WorstCaseBoundTest is RudderIntegrationBase {
         _seed(deep, address(0x1D0), -600, 600, DEPTH);
     }
 
-    function _readyOracle() internal {
+    function _readyOracle(uint256 ts) internal returns (uint256) {
         _swap(true, -1);
-        vm.warp(block.timestamp + 10);
+        ts += INTERVAL;
+        vm.warp(ts);
         _swap(false, -1);
-        vm.warp(block.timestamp + 10);
+        ts += INTERVAL;
+        vm.warp(ts);
+        return ts;
     }
 
     function _fundVault(RudderVault v, address who, uint256 amount0, uint256 amount1) internal {
