@@ -15,6 +15,9 @@ badness never blocks withdrawals. <!-- claim:RUD-001 -->
   lenient: any return above a passive hold counts, so it overstates active skill. <!-- claim:RUD-004 -->
 - **Transparent ranking.** Strategies are ranked by on-chain per-interval alpha versus a hold
   benchmark, expressed as a dimensionless return. AUM and volume never feed the ranking. <!-- claim:RUD-005 -->
+- **Permissionless alpha checkpoints.** Anyone can call `pokeAlpha()` to accrue and rebase when the
+  oracle is ready. Without a token flow it cannot change shares or payouts, and a stale or reverting
+  oracle leaves state unchanged. <!-- claim:RUD-031 -->
 
 ## Layout
 

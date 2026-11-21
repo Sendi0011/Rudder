@@ -30,3 +30,4 @@
 | protocol_price_impact_cap | killed | `test_DepositRejectedAboveProtocolCap` | 239 |
 | registry_failure_exit_independence | killed | `test_WithdrawWithRegistryRevertPaysProRata` | 236 |
 | oracle_one_sample_per_timestamp | killed | `test_OneSamplePerBlock` | 259 |
+| poke_alpha_removes_accrue | killed | `test_PokeAlphaAccruesWithoutFlow` | 440 |
