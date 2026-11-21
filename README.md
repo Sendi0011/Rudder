@@ -60,6 +60,10 @@ Local measurements from `FOUNDRY_PROFILE=ci forge test --match-contract Evidence
 - Ranking invariance: vaults at different sizes accrued the same alpha delta of **2,499,874,729,099,975**
   with **0** bps relative difference; mid-window deposit and withdrawal each changed alpha by **0**
   ([`evidence/flow_invariance.json`](evidence/flow_invariance.json)).
+- Rebalance cost: NAV fell **15** bps and alpha fell **15** bps; the hold basket stayed unchanged
+  ([`evidence/rebalance_alpha_cost.json`](evidence/rebalance_alpha_cost.json)).
+- Churn ranking: across **3** rebalances the ranking gap was **200** bps against **249** bps summed cost
+  ([`evidence/churner_alpha.json`](evidence/churner_alpha.json)).
 
 Fork test against a live network (skipped when the RPC is unset):
 
@@ -182,6 +186,10 @@ performed by these local commands. Development friction and remaining open items
 
 ## Documentation
 
+- [`docs/MANDATE.md`](docs/MANDATE.md) — scope and exclusions
+- [`docs/CLAIMS.md`](docs/CLAIMS.md) — claims linked to artifacts and commands
+- [`docs/EVIDENCE.md`](docs/EVIDENCE.md) — artifact reproduction
+- [`docs/DEPLOYMENTS.md`](docs/DEPLOYMENTS.md) — deployment state and checks
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — components and invariants
 - [`docs/DEMO.md`](docs/DEMO.md) — reviewer walkthrough
 - [`docs/THREAT_MODEL.md`](docs/THREAT_MODEL.md) — threats, vectors, mitigations

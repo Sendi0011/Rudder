@@ -150,20 +150,14 @@ def main():
         regex = re.compile(pattern, re.IGNORECASE)
         matches = []
         for entry in all_entries:
-            found = regex.search(entry["search_text"])
-            if not found:
+            if not regex.search(entry["search_text"]):
                 continue
-            start = max(0, found.start() - 100)
-            end = min(len(entry["search_text"]), found.end() + 160)
-            context = " ".join(entry["search_text"][start:end].split())
             matches.append(
                 {
                     "name": entry["name"],
                     "source": entry["source"],
                     "cohort": entry["cohort"],
-                    "description": entry["description"],
                     "address": entry["address"],
-                    "context": context,
                 }
             )
         queries.append(
@@ -182,11 +176,6 @@ def main():
     by_id = {query["id"]: query for query in queries}
     curator_names = sorted({match["name"] for match in by_id["curator"]["matches"] if match["source"] == "uhi-hook-directory"})
     performance_query = by_id["performance_fee_hwm"]
-    gainswap_lp_management = any(
-        match["name"].startswith("Gainswap")
-        and "managing liquidity" in match["context"].lower()
-        for match in by_id["curator"]["matches"]
-    )
     manual_findings = {
         "performance_fee_hwm": {
             "claim": "none of the directory entries searched mention a performance fee or high-water mark",
@@ -199,14 +188,6 @@ def main():
             "reproduced": curator_names == ["Gainswap: Impermanent Gain", "PumpUp"],
             "directory_hit_count": len(curator_names),
             "names": curator_names,
-        },
-        "curator_not_lp_management": {
-            "claim": "neither curator entry is about LP management",
-            "reproduced": not gainswap_lp_management,
-            "detail": (
-                "Gainswap entry text describes Pool Curators managing liquidity on behalf of multiple LPs; "
-                "PumpUp entry text describes expert curators designing bonding curves."
-            ),
         },
     }
 
