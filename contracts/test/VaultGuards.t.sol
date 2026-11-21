@@ -5,7 +5,7 @@ import {RudderIntegrationBase} from "./RudderIntegrationBase.sol";
 import {RudderVault} from "../src/RudderVault.sol";
 import {EnvelopeLib} from "../src/libraries/EnvelopeLib.sol";
 
-contract PlaceboTest is RudderIntegrationBase {
+contract VaultGuardsTest is RudderIntegrationBase {
     uint256 internal constant DEP = 1000e18;
 
     function test_NoRebalanceKeepsAlphaFlat() public {
