@@ -47,7 +47,7 @@ faster CI profile is available via `FOUNDRY_PROFILE=ci`.
 
 Local measurements from `FOUNDRY_PROFILE=ci forge test --match-contract EvidenceTest`.
 
-- Oracle lookup gas: **26,509** early and **56,531** at capacity; the ring holds **2,048** observations,
+- Oracle lookup gas: **9,583** early and **17,316** at capacity; the ring holds **2,048** observations,
   the TWAP window is **1,800** seconds, and the freshness bound is **3,600** seconds
   ([`evidence/oracle_gas.json`](evidence/oracle_gas.json)).
 - TWAP step response: spot moved from tick **-1** to **817** while the **1,800**-second TWAP read

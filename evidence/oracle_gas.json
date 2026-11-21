@@ -1,9 +1,9 @@
 {
   "capacity": 2048,
-  "earlyGas": 26509,
+  "earlyGas": 9583,
   "earlyObservations": 2,
   "lastObservationAge": 1,
-  "lateGas": 56531,
+  "lateGas": 17316,
   "lateObservations": 2048,
   "maxObservationAge": 3600,
   "oracleReady": true,

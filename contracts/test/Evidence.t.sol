@@ -400,6 +400,7 @@ contract EvidenceTest is RudderIntegrationBase {
             int24 lo = zeroForOne ? int24(-1200) : int24(600);
             int24 hi = zeroForOne ? int24(-600) : int24(1200);
             uint256 pre = churn.totalAssetsValue();
+            vm.warp(block.timestamp + 10);
             vm.prank(curator);
             churn.rebalance(lo, hi);
             uint256 post = churn.totalAssetsValue();
