@@ -61,4 +61,5 @@ bash scripts/check-claims.sh
 ```
 
 The first compares README figures with the JSON artifacts. The second checks that each row in
-[`CLAIMS.md`](CLAIMS.md) links one existing artifact, names one command and states one limit.
+[`CLAIMS.md`](CLAIMS.md) carries a README or prior-art marker, names a real source or test reference,
+links one existing artifact, names one command and states one limit.
