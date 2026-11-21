@@ -4,7 +4,7 @@
   "liquidity": "504106568546075814542247",
   "lower": -300,
   "maxCenterShift": 3000,
-  "maxNavLossBps": -5000,
+  "maxNavLossBps": -500,
   "maxPriceImpactBps": 10000,
   "maxRangeWidth": 6000,
   "maxTwapDistanceTicks": 6000,

@@ -39,7 +39,7 @@ contract RebalanceBoundsTest is Test {
             maxTwapDistanceTicks: 1000,
             minRebalanceInterval: 10,
             maxPriceImpactBps: 100,
-            maxNavLossBps: -1000
+            maxNavLossBps: -500
         });
         registry.registerStrategy(env);
         vm.expectRevert(abi.encodeWithSelector(EnvelopeLib.InvalidRangeWidth.selector, 200, 100));

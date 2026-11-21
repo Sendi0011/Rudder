@@ -206,6 +206,7 @@ performed by these local commands. <!-- claim:RUD-019 --> Development friction a
 - [`docs/FEEDBACK.md`](docs/FEEDBACK.md) — Uniswap v4 developer friction encountered while building
 - [`docs/adr/ADR-001-architecture.md`](docs/adr/ADR-001-architecture.md) — architecture decisions
 - [`docs/adr/ADR-002-oracle-and-rebalance-swap.md`](docs/adr/ADR-002-oracle-and-rebalance-swap.md) — oracle and rebalance decisions
+- [`docs/adr/ADR-003-protocol-nav-loss-floor.md`](docs/adr/ADR-003-protocol-nav-loss-floor.md) — protocol NAV-loss floor
 
 ## Partner integrations
 

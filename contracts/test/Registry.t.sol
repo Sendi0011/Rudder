@@ -39,6 +39,14 @@ contract RegistryTest is Test {
         assertTrue(registry.isCurator(id, curator));
     }
 
+    function test_RegisterRejectsDeepNavLossFloor() public {
+        Envelope memory e = _env();
+        e.maxNavLossBps = -501;
+        vm.prank(curator);
+        vm.expectRevert(abi.encodeWithSelector(EnvelopeLib.NavLossFloorTooLow.selector, -501, -500));
+        registry.registerStrategy(e);
+    }
+
     function test_TightenInstant() public {
         vm.prank(curator);
         uint256 id = registry.registerStrategy(_env());
