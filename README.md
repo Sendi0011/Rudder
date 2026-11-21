@@ -68,7 +68,10 @@ Local measurements from `FOUNDRY_PROFILE=ci forge test --match-contract Evidence
 - Churn ranking: across **3** rebalances the ranking gap was **200** bps against **249** bps summed cost
   ([`evidence/churner_alpha.json`](evidence/churner_alpha.json)). <!-- claim:RUD-013 -->
 - Rebalance bound: a **500** bps per-rebalance floor over **30** seconds at a **10**-second interval allowed
-  **1,856** bps across **4** rebalances; measured loss was **73** bps across **3** charged rebalances
+  **1,856** bps across **4** rebalances; measured loss was **73** bps across **3** charged rebalances.
+  For an **86,400**-second horizon, tiers with **200** bps floors at **3,600** seconds, **500** bps at
+  **1,800** seconds and **500** bps at **600** seconds allow **3,975**, **9,197** and **10,000** bps
+  across **25**, **49** and **145** rebalances
   ([`evidence/worst_case_loss.json`](evidence/worst_case_loss.json)). <!-- claim:RUD-029 -->
 - Curator sample: **4** random curators over **3** regimes and **2** envelopes saw a **-5** bps reactive
   mean against a **-7** bps placebo mean with **34** bps dispersion; worst loss was **77** bps against

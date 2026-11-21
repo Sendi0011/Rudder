@@ -35,7 +35,19 @@ are reported as tracking within that tolerance, not as equal.
 The bound in [`worst_case_loss.json`](../evidence/worst_case_loss.json) compounds the per-rebalance
 NAV-loss floor over the interval-spaced horizon described in
 [`MANDATE.md:16-31`](MANDATE.md). It measures accounting loss from rebalancing, not market-price
-drawdown.
+drawdown. The same artifact reports the seeded tiers over an 86,400-second day; each tier uses
+`floor(T/I) + 1` rebalances because the horizon starts at bootstrap and the first range-set skips the
+interval check.
+
+| Tier | Interval | NAV-loss floor | Rebalances | 24-hour bound |
+| --- | --- | --- | --- | --- |
+| Conservative | 3,600 s | -200 bps | 25 | 3,975 bps |
+| Balanced | 1,800 s | -500 bps | 49 | 9,197 bps |
+| Aggressive | 600 s | -500 bps | 145 | 10,000 bps |
+
+The bounds are compounding accounting ceilings, not a spendable daily allowance. The conservative
+tier keeps a residual floor above zero; the two faster tiers can reach the full 10,000 bps ceiling
+under repeated maximum-loss rebalances.
 
 The [`placebo_curators.json`](../evidence/placebo_curators.json) sample uses fixed seeds, exact-input
 swaps and shared local pools. It compares reactive, static and random curators on the same price

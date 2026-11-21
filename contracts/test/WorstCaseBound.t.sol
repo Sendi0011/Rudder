@@ -13,6 +13,13 @@ contract WorstCaseBoundTest is RudderIntegrationBase {
     uint256 internal constant LOSS_CAP_BPS = 500;
     uint256 internal constant INTERVAL = 10;
     uint256 internal constant CHARGED_REBALANCES = 3;
+    uint256 internal constant HORIZON = 86_400;
+    uint256 internal constant CONSERVATIVE_LOSS_CAP_BPS = 200;
+    uint256 internal constant CONSERVATIVE_INTERVAL = 3600;
+    uint256 internal constant BALANCED_LOSS_CAP_BPS = 500;
+    uint256 internal constant BALANCED_INTERVAL = 1800;
+    uint256 internal constant AGGRESSIVE_LOSS_CAP_BPS = 500;
+    uint256 internal constant AGGRESSIVE_INTERVAL = 600;
 
     function test_WorstCaseBoundCoversObservedRebalanceLosses() public {
         Envelope memory env = Envelope({
@@ -55,7 +62,27 @@ contract WorstCaseBoundTest is RudderIntegrationBase {
         uint256 bound = _boundBps(LOSS_CAP_BPS, boundCount);
         uint256 observed = 10_000 - surviving;
 
+        uint256 conservativeCount = HORIZON / CONSERVATIVE_INTERVAL + 1;
+        uint256 balancedCount = HORIZON / BALANCED_INTERVAL + 1;
+        uint256 aggressiveCount = HORIZON / AGGRESSIVE_INTERVAL + 1;
+        uint256 conservativeBound = _boundBps(CONSERVATIVE_LOSS_CAP_BPS, conservativeCount);
+        uint256 balancedBound = _boundBps(BALANCED_LOSS_CAP_BPS, balancedCount);
+        uint256 aggressiveBound = _boundBps(AGGRESSIVE_LOSS_CAP_BPS, aggressiveCount);
+
         string memory obj = "worstCaseLoss";
+        vm.serializeUint(obj, "horizonSeconds", HORIZON);
+        vm.serializeUint(obj, "conservativeLossCapBps", CONSERVATIVE_LOSS_CAP_BPS);
+        vm.serializeUint(obj, "conservativeIntervalSeconds", CONSERVATIVE_INTERVAL);
+        vm.serializeUint(obj, "conservativeBoundRebalances", conservativeCount);
+        vm.serializeUint(obj, "conservativeBoundBps", conservativeBound);
+        vm.serializeUint(obj, "balancedLossCapBps", BALANCED_LOSS_CAP_BPS);
+        vm.serializeUint(obj, "balancedIntervalSeconds", BALANCED_INTERVAL);
+        vm.serializeUint(obj, "balancedBoundRebalances", balancedCount);
+        vm.serializeUint(obj, "balancedBoundBps", balancedBound);
+        vm.serializeUint(obj, "aggressiveLossCapBps", AGGRESSIVE_LOSS_CAP_BPS);
+        vm.serializeUint(obj, "aggressiveIntervalSeconds", AGGRESSIVE_INTERVAL);
+        vm.serializeUint(obj, "aggressiveBoundRebalances", aggressiveCount);
+        vm.serializeUint(obj, "aggressiveBoundBps", aggressiveBound);
         vm.serializeUint(obj, "lossCapBps", LOSS_CAP_BPS);
         vm.serializeUint(obj, "intervalSeconds", INTERVAL);
         vm.serializeUint(obj, "elapsedSeconds", elapsed);
@@ -67,6 +94,14 @@ contract WorstCaseBoundTest is RudderIntegrationBase {
             vm.writeJson(json, "evidence/worst_case_loss.json");
         }
 
+        assertEq(conservativeCount, 25, "conservative tier rebalance count");
+        assertEq(balancedCount, 49, "balanced tier rebalance count");
+        assertEq(aggressiveCount, 145, "aggressive tier rebalance count");
+        assertEq(conservativeBound, 3975, "conservative tier 24-hour bound");
+        assertEq(balancedBound, 9197, "balanced tier 24-hour bound");
+        assertEq(aggressiveBound, 10_000, "aggressive tier 24-hour bound");
+        assertLt(conservativeBound, balancedBound, "tiers must tighten monotonically");
+        assertLt(balancedBound, aggressiveBound, "tiers must tighten monotonically");
         assertGt(observed, 0, "rebalances must realize a measurable cost");
         assertLe(observed, bound, "observed rebalance loss must fit the envelope bound");
     }
