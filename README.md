@@ -2,19 +2,19 @@
 
 A Uniswap v4 hook plus vault system for **curated liquidity**. Curators steer an LP position inside
 an on-chain mandate (an *envelope*); LPs never relinquish custody. Exit always works, and oracle
-badness never blocks withdrawals.
+badness never blocks withdrawals. <!-- claim:RUD-001 -->
 
 - **Curator steers, never custodies.** A curator can only move the position inside bounds enforced
   by `EnvelopeLib` — range width, centre shift, rebalance interval, price impact, NAV loss, and
-  distance from the TWAP tick. Every violation reverts.
+  distance from the TWAP tick. Every violation reverts. <!-- claim:RUD-002 -->
 - **Manipulation-resistant oracle.** `RudderHook` samples prices in `beforeSwap` (the pre-swap
   price), one sample per timestamp, and serves a time-weighted average. A swapper cannot choose the
-  price it is recorded at.
+  price it is recorded at. <!-- claim:RUD-003 -->
 - **Hold-benchmarked performance fees.** Fees apply only to `max(0, value − hold)` at the TWAP, are
   capped, and crystallize at withdrawal. A stale oracle yields zero fee. The benchmark is deliberately
-  lenient: any return above a passive hold counts, so it overstates active skill.
+  lenient: any return above a passive hold counts, so it overstates active skill. <!-- claim:RUD-004 -->
 - **Transparent ranking.** Strategies are ranked by on-chain per-interval alpha versus a hold
-  benchmark, expressed as a dimensionless return. AUM and volume never feed the ranking.
+  benchmark, expressed as a dimensionless return. AUM and volume never feed the ranking. <!-- claim:RUD-005 -->
 
 ## Layout
 
@@ -41,7 +41,7 @@ forge test --via-ir
 ```
 
 `via-ir` is required (the default pipeline reports "Stack too deep" in `RudderVault.withdraw`). A
-faster CI profile is available via `FOUNDRY_PROFILE=ci`.
+faster CI profile is available via `FOUNDRY_PROFILE=ci`. <!-- claim:RUD-006 -->
 
 ## Numbers
 
@@ -49,23 +49,30 @@ Local measurements from `FOUNDRY_PROFILE=ci forge test --match-contract Evidence
 
 - Oracle lookup gas: **9,583** early and **17,316** at capacity; the ring holds **2,048** observations,
   the TWAP window is **1,800** seconds, and the freshness bound is **3,600** seconds
-  ([`evidence/oracle_gas.json`](evidence/oracle_gas.json)).
+  ([`evidence/oracle_gas.json`](evidence/oracle_gas.json)). <!-- claim:RUD-007 -->
 - TWAP step response: spot moved from tick **-1** to **817** while the **1,800**-second TWAP read
   **135** after **30** observations, a **682**-tick gap from spot and **67** bps sqrt-price deviation
-  ([`evidence/twap_accuracy.json`](evidence/twap_accuracy.json)).
+  ([`evidence/twap_accuracy.json`](evidence/twap_accuracy.json)). <!-- claim:RUD-008 -->
 - Rebalance mandate: width **600** ticks, centre shift **0** ticks, elapsed **20** seconds since the
-  prior rebalance, and NAV change **-5** bps ([`evidence/rebalance_bounds.json`](evidence/rebalance_bounds.json)).
+  prior rebalance, and NAV change **-5** bps ([`evidence/rebalance_bounds.json`](evidence/rebalance_bounds.json)). <!-- claim:RUD-009 -->
 - Deposit guard: manipulated spot deviated **109** bps against a **50** bps envelope cap and **50** bps
-  protocol cap before `SpotTwapDeviation` ([`evidence/deposit_guard.json`](evidence/deposit_guard.json)).
+  protocol cap before `SpotTwapDeviation` ([`evidence/deposit_guard.json`](evidence/deposit_guard.json)). <!-- claim:RUD-010 -->
 - Ranking invariance: vaults at different sizes accrued the same alpha delta of **2,499,874,729,099,975**
   with **0** bps relative difference; mid-window deposit and withdrawal each changed alpha by **0**
-  ([`evidence/flow_invariance.json`](evidence/flow_invariance.json)).
+  ([`evidence/flow_invariance.json`](evidence/flow_invariance.json)). <!-- claim:RUD-011 -->
 - Rebalance cost: NAV fell **15** bps and alpha fell **15** bps; the hold basket stayed unchanged
-  ([`evidence/rebalance_alpha_cost.json`](evidence/rebalance_alpha_cost.json)).
+  ([`evidence/rebalance_alpha_cost.json`](evidence/rebalance_alpha_cost.json)). <!-- claim:RUD-012 -->
 - Churn ranking: across **3** rebalances the ranking gap was **200** bps against **249** bps summed cost
-  ([`evidence/churner_alpha.json`](evidence/churner_alpha.json)).
+  ([`evidence/churner_alpha.json`](evidence/churner_alpha.json)). <!-- claim:RUD-013 -->
+- Rebalance bound: a **500** bps per-rebalance floor over **30** seconds at a **10**-second interval allowed
+  **1,856** bps across **4** rebalances; measured loss was **73** bps across **3** charged rebalances
+  ([`evidence/worst_case_loss.json`](evidence/worst_case_loss.json)). <!-- claim:RUD-029 -->
+- Curator sample: **4** random curators over **3** regimes and **2** envelopes saw a **-5** bps reactive
+  mean against a **-7** bps placebo mean with **34** bps dispersion; worst loss was **77** bps against
+  a **9,981** bps bound and **183** bps drawdown
+  ([`evidence/placebo_curators.json`](evidence/placebo_curators.json)). <!-- claim:RUD-030 -->
 
-Fork test against a live network (skipped when the RPC is unset):
+Fork test against a live network (skipped when the RPC is unset): <!-- claim:RUD-014 -->
 
 ```
 UNICHAIN_SEPOLIA_RPC_URL=<rpc> forge test --match-contract ForkLifecycleTest -vvv
@@ -166,12 +173,12 @@ manipulated deposit, withdraw through a stale oracle, rank strategies, and migra
 
 ### v4 surface
 
-- `beforeAddLiquidity` allows liquidity changes only from factory-created vaults.
+- `beforeAddLiquidity` allows liquidity changes only from factory-created vaults. <!-- claim:RUD-016 -->
 - `beforeSwap` records the pre-swap tick at most once per timestamp into a fixed ring, so a swapper
-  cannot choose the price used by the vault's TWAP.
-- Vaults call `PoolManager.unlock` directly; no NFT position manager holds the position.
+  cannot choose the price used by the vault's TWAP. <!-- claim:RUD-017 -->
+- Vaults call `PoolManager.unlock` directly; no NFT position manager holds the position. <!-- claim:RUD-018 -->
 - The hook is deployed with CREATE2 at an address whose low bits match its permissions, and the
-  factory refuses any pool that does not use that hook.
+  factory refuses any pool that does not use that hook. <!-- claim:RUD-015 -->
 
 ### Run it locally
 
@@ -181,7 +188,7 @@ FOUNDRY_PROFILE=ci forge test
 ```
 
 See [Deployment](#deployment) for RPC setup and script commands. No broadcast or live deployment is
-performed by these local commands. Development friction and remaining open items are collected in
+performed by these local commands. <!-- claim:RUD-019 --> Development friction and remaining open items are collected in
 [`docs/FEEDBACK.md`](docs/FEEDBACK.md) and [`docs/OPEN_QUESTIONS.md`](docs/OPEN_QUESTIONS.md).
 
 ## Documentation
@@ -203,7 +210,7 @@ performed by these local commands. Development friction and remaining open items
 ## Partner integrations
 
 No partner integrations. There is no partner SDK, adapter, route or partner-specific callback in
-`contracts/src`, `contracts/script` or `frontend/`.
+`contracts/src`, `contracts/script` or `frontend/`. <!-- claim:RUD-020 -->
 
 ## Built during the hookathon
 
@@ -231,20 +238,20 @@ The reproducible search and neighbor comparison are in [`docs/prior-art.md`](doc
 
 | Neighbor | Evidence level | Bounded mechanism | Rudder contrast |
 | --- | --- | --- | --- |
-| Invariant | code read, commit `476778e` | tick bounds and minimum range width | per-vault mandate adds centre shift, interval, TWAP distance and price impact with delayed loosening |
-| CoPool Hook | code read, commit `9bdd059` | token selection, balances and pooled liquidity | per-depositor hold-basis fees and share-based exits are in the Rudder code and tests |
-| TickRangeHook | code read, explorer source | tick lower and upper bounds | Rudder checks width, shift, interval, TWAP distance and price impact |
-| M0 Tick Range Hook | code read, explorer source | tick lower and upper bounds | Rudder checks width, shift, interval, TWAP distance and price impact |
-| CuratedLP | code read, commit `0bcce80` | tick ordering, spacing, interval, fee cap and delegation bounds | Rudder adds hold-basis fees and a flow-invariant alpha ranking |
-| Sentinel v4 | code read, commit `5aa883e` | oracle deviation, yield thresholds and automation width fallback | Rudder ties bounds to a per-vault mandate and timelocked loosening |
-| Ghostbot | code read, commit `0ca2b56` | ticks, cooldown, fee change and signal freshness | Rudder evaluates performance per depositor against a hold basket |
+| Invariant | code read, commit `476778e` | tick bounds and minimum range width | per-vault mandate adds centre shift, interval, TWAP distance and price impact with delayed loosening | <!-- claim:RUD-021 -->
+| CoPool Hook | code read, commit `9bdd059` | token selection, balances and pooled liquidity | per-depositor hold-basis fees and share-based exits are in the Rudder code and tests | <!-- claim:RUD-022 -->
+| TickRangeHook | code read, explorer source | tick lower and upper bounds | Rudder checks width, shift, interval, TWAP distance and price impact | <!-- claim:RUD-023 -->
+| M0 Tick Range Hook | code read, explorer source | tick lower and upper bounds | Rudder checks width, shift, interval, TWAP distance and price impact | <!-- claim:RUD-024 -->
+| CuratedLP | code read, commit `0bcce80` | tick ordering, spacing, interval, fee cap and delegation bounds | Rudder adds hold-basis fees and a flow-invariant alpha ranking | <!-- claim:RUD-025 -->
+| Sentinel v4 | code read, commit `5aa883e` | oracle deviation, yield thresholds and automation width fallback | Rudder ties bounds to a per-vault mandate and timelocked loosening | <!-- claim:RUD-026 -->
+| Ghostbot | code read, commit `0ca2b56` | ticks, cooldown, fee change and signal freshness | Rudder evaluates performance per depositor against a hold basket | <!-- claim:RUD-027 -->
 
 ## Known limitations
 
 ### Not audited
 
 Rudder has not been audited. The tests and evidence artifacts are local checks, not a security
-review.
+review. <!-- claim:RUD-028 -->
 
 ## Demo
 

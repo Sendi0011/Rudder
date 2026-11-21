@@ -1,0 +1,18 @@
+{
+  "envelopes": 2,
+  "k": 4,
+  "lossBoundBps": 9981,
+  "maxDrawdownVsHoldBps": 183,
+  "placeboMaxBps": 56,
+  "placeboMeanBps": -7,
+  "placeboMinBps": -146,
+  "placeboP25Bps": -12,
+  "placeboP50Bps": 0,
+  "placeboP75Bps": 0,
+  "placeboStdBps": 34,
+  "reactiveBeatsPlaceboMean": true,
+  "reactiveMeanBps": -5,
+  "regimes": 3,
+  "staticMeanBps": 0,
+  "worstRebalanceLossBps": 77
+}

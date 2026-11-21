@@ -5,7 +5,7 @@ import {RudderIntegrationBase} from "./RudderIntegrationBase.sol";
 import {RudderVault} from "../src/RudderVault.sol";
 import {Envelope} from "../src/libraries/EnvelopeLib.sol";
 
-contract WorstCaseTest is RudderIntegrationBase {
+contract EnvelopeExtremesTest is RudderIntegrationBase {
     uint256 internal constant DEP = 1000e18;
 
     function test_WidestEnvelopeRangeIsAccepted() public {

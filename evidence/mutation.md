@@ -25,3 +25,8 @@
 | vault_price_impact_post_call | killed | `test_RebalanceStopsAtPriceLimitAndLeavesResidual` | 178 |
 | vault_nav_loss_call | killed | `test_RevertOnNavLoss` | 237 |
 | vault_alpha_cost_call | killed | `test_CostlyRebalanceChargesAlphaForNavLoss` | 294 |
+| registry_checkpoint_interval_boundary | killed | `test_AlphaHistoryBoundedByRingBuffer` | 123 |
+| leaderboard_page_cap_value | killed | `test_LeaderboardPageIsBounded` | 143 |
+| protocol_price_impact_cap | killed | `test_DepositRejectedAboveProtocolCap` | 239 |
+| registry_failure_exit_independence | killed | `test_WithdrawWithRegistryRevertPaysProRata` | 236 |
+| oracle_one_sample_per_timestamp | killed | `test_OneSamplePerBlock` | 259 |

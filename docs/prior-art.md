@@ -4,12 +4,12 @@
 
 Rudder's claim is the combination, in one vault system, of:
 
-- a per-vault mandate stored in a registry (`contracts/src/StrategyRegistry.sol:115-140`);
-- several bounds at once: range width, centre shift, minimum rebalance interval, TWAP distance and price impact (`contracts/src/libraries/EnvelopeLib.sol:50-69`, `contracts/src/RudderVault.sol:371-386`, `contracts/src/RudderHook.sol:290-293`);
-- instant tightening with a delayed loosening path (`contracts/src/StrategyRegistry.sol:114-140`);
-- exits that do not consult oracle state, a registry or an unbounded loop (`contracts/src/RudderVault.sol:312-328`, `contracts/src/RudderVault.sol:716-731`, `contracts/test/WithdrawIndependence.t.sol`);
-- performance fees charged per depositor against that depositor's hold basket (`contracts/src/RudderVault.sol:312-323`, `contracts/src/libraries/NAVMath.sol:32-43`); and
-- a flow-invariant alpha ranking that scores vault return against the hold benchmark (`contracts/src/StrategyRegistry.sol:157-189`, `evidence/flow_invariance.json`).
+- a per-vault mandate stored in a registry (`contracts/src/StrategyRegistry.sol:115-140`); <!-- claim:PA-001 -->
+- several bounds at once: range width, centre shift, minimum rebalance interval, TWAP distance and price impact (`contracts/src/libraries/EnvelopeLib.sol:50-69`, `contracts/src/RudderVault.sol:371-386`, `contracts/src/RudderHook.sol:290-293`); <!-- claim:PA-002 -->
+- instant tightening with a delayed loosening path (`contracts/src/StrategyRegistry.sol:114-140`); <!-- claim:PA-003 -->
+- exits that do not consult oracle state, a registry or an unbounded loop (`contracts/src/RudderVault.sol:312-328`, `contracts/src/RudderVault.sol:716-731`, `contracts/test/WithdrawIndependence.t.sol`); <!-- claim:PA-004 -->
+- performance fees charged per depositor against that depositor's hold basket (`contracts/src/RudderVault.sol:312-323`, `contracts/src/libraries/NAVMath.sol:32-43`); and <!-- claim:PA-005 -->
+- a flow-invariant alpha ranking that scores vault return against the hold benchmark (`contracts/src/StrategyRegistry.sol:157-189`, `evidence/flow_invariance.json`). <!-- claim:PA-006 -->
 
 Rudder reuses known pieces: TWAP oracles, performance fees against a benchmark, vault shares and hook-level range checks. The combination and the code-level coupling are the subject of this document.
 

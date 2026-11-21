@@ -83,6 +83,11 @@ MUTATIONS=(
     vault_price_impact_post_call
     vault_nav_loss_call
     vault_alpha_cost_call
+    registry_checkpoint_interval_boundary
+    leaderboard_page_cap_value
+    protocol_price_impact_cap
+    registry_failure_exit_independence
+    oracle_one_sample_per_timestamp
 )
 
 TESTS=(
@@ -109,6 +114,11 @@ TESTS=(
     test_RebalanceStopsAtPriceLimitAndLeavesResidual
     test_RevertOnNavLoss
     test_CostlyRebalanceChargesAlphaForNavLoss
+    test_AlphaHistoryBoundedByRingBuffer
+    test_LeaderboardPageIsBounded
+    test_DepositRejectedAboveProtocolCap
+    test_WithdrawWithRegistryRevertPaysProRata
+    test_OneSamplePerBlock
 )
 
 find_test() {
@@ -254,6 +264,33 @@ patches = {
 
         lastRebalanceTimestamp = uint48(block.timestamp);""",
         """        lastRebalanceTimestamp = uint48(block.timestamp);""",
+    ),
+    "registry_checkpoint_interval_boundary": (
+        "contracts/src/StrategyRegistry.sol",
+        """        if (h.count == 0 || block.timestamp - _newestTs(h) >= CHECKPOINT_INTERVAL) {""",
+        """        if (h.count == 0 || block.timestamp - _newestTs(h) > CHECKPOINT_INTERVAL) {""",
+    ),
+    "leaderboard_page_cap_value": (
+        "contracts/src/StrategyRegistry.sol",
+        """    uint256 public constant MAX_LEADERBOARD_PAGE = 100;""",
+        """    uint256 public constant MAX_LEADERBOARD_PAGE = 1;""",
+    ),
+    "protocol_price_impact_cap": (
+        "contracts/src/RudderVault.sol",
+        """            uint32 cap = env.maxPriceImpactBps < PROTOCOL_MAX_PRICE_IMPACT_BPS
+                ? env.maxPriceImpactBps
+                : PROTOCOL_MAX_PRICE_IMPACT_BPS;""",
+        """            uint32 cap = env.maxPriceImpactBps;""",
+    ),
+    "registry_failure_exit_independence": (
+        "contracts/src/RudderVault.sol",
+        """        try IStrategyRegistry(registry).checkpointAlpha(strategyId, cumulativeAlpha) {} catch {}""",
+        """        IStrategyRegistry(registry).checkpointAlpha(strategyId, cumulativeAlpha);""",
+    ),
+    "oracle_one_sample_per_timestamp": (
+        "contracts/src/RudderHook.sol",
+        """        if (o.count > 0 && _newest(o).timestamp == uint32(block.timestamp)) return;""",
+        """        {}""",
     ),
 }
 

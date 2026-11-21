@@ -8,30 +8,19 @@ import {IPoolManager} from "v4-core/interfaces/IPoolManager.sol";
 import {RudderHook} from "../src/RudderHook.sol";
 import {StrategyRegistry} from "../src/StrategyRegistry.sol";
 
-interface ICreate2DeployerTest {
-    function deploy(bytes memory code, bytes32 salt) external returns (address);
-}
-
-contract Create2DeployerTest {
-    function deploy(bytes memory code, bytes32 salt) external returns (address addr) {
-        assembly {
-            addr := create2(0, add(code, 0x20), mload(code), salt)
-        }
-        require(addr != address(0), "create2 failed");
-    }
-}
-
 contract DeployScriptTest is Test {
     address internal constant CREATE2_PROXY = 0x4e59b44847b379578588920cA78FbF26c0B4956C;
     address internal constant POOL_MANAGER = address(0x1234);
+    bytes internal constant CANONICAL_PROXY_CODE =
+        hex"7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe03601600081602082378035828234f58015156039578182fd5b8082525050506014600cf3";
     address internal owner;
 
     function setUp() public {
         vm.startBroadcast();
         owner = msg.sender;
         vm.stopBroadcast();
-        Create2DeployerTest impl = new Create2DeployerTest();
-        vm.etch(CREATE2_PROXY, address(impl).code);
+        vm.etch(CREATE2_PROXY, CANONICAL_PROXY_CODE);
+        assertEq(CREATE2_PROXY.code.length, 69);
         vm.setEnv("POOL_MANAGER", vm.toString(POOL_MANAGER));
         vm.setEnv("OWNER", vm.toString(owner));
         vm.setEnv("WRITE_DEPLOYMENTS", "0");
@@ -52,6 +41,16 @@ contract DeployScriptTest is Test {
         assertEq(RudderHook(d.hook).vaultFactory(), d.factory);
         assertEq(StrategyRegistry(d.registry).factory(), d.factory);
         assertNotEq(d.vaultImplementation, address(0));
+    }
+
+    function test_DeployScriptDoesNotUseDeploySelector() public {
+        bytes memory hookCode =
+            abi.encodePacked(type(RudderHook).creationCode, abi.encode(IPoolManager(POOL_MANAGER), owner));
+        (, bytes32 salt) = _mine(hookCode);
+
+        vm.expectCall(CREATE2_PROXY, abi.encodePacked(salt, hookCode));
+        Deploy deployer = new Deploy();
+        deployer.run();
     }
 
     function _mine(bytes memory code) internal pure returns (address expected, bytes32 salt) {
