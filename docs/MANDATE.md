@@ -30,6 +30,23 @@ A horizon that starts after bootstrap with a known last rebalance timestamp repl
 zero when no immediate rebalance is allowed. The bound compounds the accounting loss measured by
 `RudderVault._navLossBps`; it is not a market-price drawdown bound.
 
+## Envelope authority
+
+Only the registered curator for a strategy may change that strategy's envelope. `tightenEnvelope`
+applies a strictly tighter envelope immediately and cancels any pending loosening. A looser change
+must be queued with `queueLoosenEnvelope` and can only be applied by the same curator after
+`LOOSEN_DELAY`; the checks live in
+[`StrategyRegistry.sol:114-140`](../contracts/src/StrategyRegistry.sol). The curator has no withdrawal
+or transfer right over LP funds; the registry stores the envelope, curator identity, bound vault and
+alpha samples only.
+
+## Rebalance cost and ranking
+
+The registry ranking gap and the summed pre/post NAV loss from rebalances are distinct figures. The
+first is a change in dimensionless alpha; the second is an accounting loss in basis points. They are
+reported together as tracking measurements, with the local tolerance stated in
+[`EVIDENCE.md:28-31`](EVIDENCE.md), and neither figure is a profit guarantee.
+
 ## Out of scope
 
 - No audit, security review or deployment-readiness assertion.
