@@ -60,6 +60,15 @@ fields = {
         ["churner_alpha.json:rankingGapBps"],
         ["churner_alpha.json:summedCostBps"],
     ],
+    "worst_case_loss.json": [
+        ["worst_case_loss.json:lossCapBps"],
+        ["worst_case_loss.json:elapsedSeconds"],
+        ["worst_case_loss.json:intervalSeconds"],
+        ["worst_case_loss.json:boundBps"],
+        ["worst_case_loss.json:boundRebalances"],
+        ["worst_case_loss.json:observedLossBps"],
+        ["worst_case_loss.json:chargedRebalances"],
+    ],
 }
 
 lines = readme.read_text(encoding="utf-8").splitlines()
@@ -107,7 +116,8 @@ for bullet in bullets:
     if artifact not in fields:
         failures.append(f"no field map for evidence/{artifact}")
         continue
-    text = re.sub(r"\[[^\]]*\]\([^)]*\)", "", bullet)
+    text = re.sub(r"<!--.*?-->", "", bullet)
+    text = re.sub(r"\[[^\]]*\]\([^)]*\)", "", text)
     text = text.replace("`", "").replace("**", "")
     numbers = [int(token.replace(",", "")) for token in re.findall(r"(?<![\w])-?\d[\d,]*(?![\w])", text)]
     specs = fields[artifact]

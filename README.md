@@ -64,6 +64,9 @@ Local measurements from `FOUNDRY_PROFILE=ci forge test --match-contract Evidence
   ([`evidence/rebalance_alpha_cost.json`](evidence/rebalance_alpha_cost.json)).
 - Churn ranking: across **3** rebalances the ranking gap was **200** bps against **249** bps summed cost
   ([`evidence/churner_alpha.json`](evidence/churner_alpha.json)).
+- Rebalance bound: a **500** bps per-rebalance floor over **30** seconds at a **10**-second interval allowed
+  **1,856** bps across **4** rebalances; measured loss was **73** bps across **3** charged rebalances
+  ([`evidence/worst_case_loss.json`](evidence/worst_case_loss.json)).
 
 Fork test against a live network (skipped when the RPC is unset):
 
