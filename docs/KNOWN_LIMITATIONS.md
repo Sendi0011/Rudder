@@ -23,6 +23,18 @@ each item is either an accepted design trade-off or work that is not yet done.
   subsequent deposit and rebalance requires a ready oracle; the exemption is a one-way flag that
   never re-opens.
 
+## What the envelope costs
+
+- **Reaction is paced by the envelope.** After the first range-set, a curator cannot re-centre faster
+  than `minRebalanceInterval` and cannot move the centre farther than `maxCenterShift` in one step.
+  A fast price path can outrun the range between allowed rebalances.
+- **The tiers trade speed for protection.** Tighter envelopes lengthen the interval and shorten the
+  allowed range, which reduces the room to act and the frequency of action at the same time. Looser
+  envelopes buy responsiveness by allowing wider ranges and larger per-step loss.
+- **A daily-budget variant is future work.** The registry caps each action, but it does not cap the
+  sum of allowed losses over a rolling day. The compounding limits in
+  [`MANDATE.md`](MANDATE.md) describe the ceiling; they do not allocate a spendable daily allowance.
+
 ## Resolved
 
 - **Alpha history and leaderboard reads are bounded.** A vault reports its cumulative alpha on every
