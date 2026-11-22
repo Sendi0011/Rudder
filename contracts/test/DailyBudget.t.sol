@@ -81,16 +81,29 @@ contract DailyBudgetTest is RudderIntegrationBase {
     }
 
     function _step(RudderVault v, bool zeroForOne) public returns (uint256 cost) {
+        (cost,,) = this._stepWithNav(v, zeroForOne);
+    }
+
+    function _stepWithNav(RudderVault v, bool zeroForOne)
+        public
+        returns (uint256 cost, uint256 preNav, uint256 postNav)
+    {
         int24 lo = zeroForOne ? int24(-6000) : int24(0);
         int24 hi = zeroForOne ? int24(0) : int24(6000);
+        token0.mint(alice, DEPOSIT / 100);
+        token1.mint(alice, DEPOSIT / 100);
+        vm.prank(alice);
+        v.deposit(DEPOSIT / 100, DEPOSIT / 100, alice);
+        preNav = v.totalAssetsValue();
         vm.recordLogs();
         vm.prank(curator);
         v.rebalance(lo, hi);
+        postNav = v.totalAssetsValue();
         Vm.Log[] memory logs = vm.getRecordedLogs();
         for (uint256 i; i < logs.length; i++) {
             if (logs[i].topics[0] == keccak256("LossBucketUpdated(uint256,uint256,uint256)")) {
                 (cost,) = abi.decode(logs[i].data, (uint256, uint256));
-                return cost;
+                return (cost, preNav, postNav);
             }
         }
     }
@@ -112,17 +125,24 @@ contract DailyBudgetTest is RudderIntegrationBase {
         assertEq(v.lossBucket(), seeded);
     }
 
-    function test_BucketRefillsAndAllowsRebalance() public {
+    function test_BucketRefillsAtDailyRateAndRoundsUpCost() public {
         (RudderVault v,) = _setup(_env(40, -20, 10));
         uint256 capacity = (40 * 1_000_000) / 2;
-        _seedBucket(v, capacity - 100_000);
+        uint256 seeded = (capacity * 3) / 10;
+        _seedBucket(v, seeded);
         _advance(11);
         vm.expectPartialRevert(RudderVault.DailyNavLossBudgetExceeded.selector);
         this._step(v, true);
 
-        (uint256 cost,) = _spend(v, 86_400, true);
+        uint256 last = v.lastBucketUpdate();
+        _advance(3601);
+        uint256 elapsed = block.timestamp - last;
+        (uint256 cost, uint256 preNav, uint256 postNav) = this._stepWithNav(v, true);
         assertGt(cost, 0);
-        assertEq(v.lossBucket(), cost);
+        if (preNav > 0 && postNav < preNav) {
+            assertEq(cost, ((preNav - postNav) * 10_000_000_000 + preNav - 1) / preNav);
+        }
+        assertEq(v.lossBucket(), seeded - elapsed * (capacity / 86_400) + cost);
         assertLe(v.lossBucket(), capacity);
     }
 
@@ -214,10 +234,19 @@ contract DailyBudgetTest is RudderIntegrationBase {
         registry.registerStrategy(_env(100, -100, 10));
     }
 
+    function test_QueuedLoosenRejectsInvalidDailyBudget() public {
+        (, uint256 id) = _setup(_env(40, -20, 10));
+        vm.expectRevert(EnvelopeLib.ZeroDailyNavLossBudget.selector);
+        vm.prank(curator);
+        registry.queueLoosenEnvelope(id, _env(0, -20, 10));
+    }
+
     function test_IsTighterTreatsSmallerBudgetAsTighter() public pure {
         Envelope memory loose = _env(1000, -500, 10);
         Envelope memory tight = _env(500, -250, 10);
+        Envelope memory budgetOnlyLoosen = _env(1000, -250, 10);
         assertTrue(EnvelopeLib.isTighter(loose, tight));
         assertFalse(EnvelopeLib.isTighter(tight, loose));
+        assertFalse(EnvelopeLib.isTighter(tight, budgetOnlyLoosen));
     }
 }
