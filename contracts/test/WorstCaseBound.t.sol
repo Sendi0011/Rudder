@@ -87,14 +87,13 @@ contract WorstCaseBoundTest is RudderIntegrationBase {
         vm.prank(bob);
         v.deposit(1e18, 1e18, bob);
 
-        uint256 bootstrap = ts;
         uint256 attempts = HORIZON / interval + 1;
         uint256 observedMicroBps;
         uint256 maxCostMicroBps;
         for (uint256 i = 0; i < attempts; i++) {
             bool zeroForOne = i % 2 == 0;
             _swap(zeroForOne, int256(SWAP_AMOUNT));
-            ts = bootstrap + (i + 1) * interval;
+            ts = block.timestamp + interval;
             vm.warp(ts);
             int24 lo = zeroForOne ? int24(-1200) : int24(600);
             int24 hi = zeroForOne ? int24(-600) : int24(1200);
