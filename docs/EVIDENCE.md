@@ -21,8 +21,8 @@ WRITE_EVIDENCE=1 FOUNDRY_PROFILE=ci forge test --match-contract VaultInvariantsT
 | `flow_invariance.json` | `test_FlowInvarianceEvidence` | Alpha under size and flow changes |
 | `rebalance_alpha_cost.json` | `test_RebalanceCostEvidence` | NAV and alpha loss from a rebalance |
 | `churner_alpha.json` | `test_RebalanceCostEvidence` | Ranking gap against summed rebalance cost |
-| `worst_case_loss.json` | `test_WorstCaseBoundCoversObservedRebalanceLosses` | Compounded envelope bound against observed rebalance loss |
-| `placebo_curators.json` | `test_PlaceboCuratorDistribution` | Reactive, static and random curator alpha distribution |
+| `worst_case_loss.json` | `test_WorstCaseBoundCoversObservedRebalanceLosses` | Daily budget bounds against observed charged rebalance loss |
+| `placebo_curators.json` | `test_PlaceboCuratorDistribution` | Curator alpha distribution in hundredths of a bps |
 | `invariant_runs.json` | `invariant_ActionsExecuted` | Invariant run settings and action counters |
 
 The `rankingGapBps` and `summedCostBps` fields in
@@ -32,41 +32,48 @@ are 200 and 249 bps. The source assertion at
 [`Evidence.t.sol:413-424`](../contracts/test/Evidence.t.sol) allows a 40% relative gap, so the figures
 are reported as tracking within that tolerance, not as equal.
 
-The bound in [`worst_case_loss.json`](../evidence/worst_case_loss.json) compounds the per-rebalance
-NAV-loss floor over the interval-spaced horizon described in
-[`MANDATE.md:16-31`](MANDATE.md). It measures accounting loss from rebalancing, not market-price
-drawdown. The same artifact reports the seeded tiers over an 86,400-second day; each tier uses
-`floor(T/I) + 1` rebalances because the horizon starts at bootstrap and the first range-set skips the
-interval check.
+The daily-budget artifact reports each tier's interval, NAV-loss floor, budget, bound, observed
+charged loss and rebalance count over the horizon in
+[`worst_case_loss.json`](../evidence/worst_case_loss.json). `ObservedBps` sums charged
+`LossBucketUpdated` costs rounded up to whole bps, and `BoundBps` is the daily budget. A rebalance
+that is rejected by the bucket is not counted. These are accounting figures, not market drawdown.
 
-| Tier | Interval | NAV-loss floor | Rebalances | 24-hour bound |
-| --- | --- | --- | --- | --- |
-| Conservative | 3,600 s | -200 bps | 25 | 3,975 bps |
-| Balanced | 1,800 s | -500 bps | 49 | 9,197 bps |
-| Aggressive | 600 s | -500 bps | 145 | 10,000 bps |
+| Tier | Interval | NAV-loss floor | Daily budget | Bound | Observed | Max charged step | Rebalances |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Conservative | 3,600 s | 50 bps | 200 bps | 200 bps | 198 bps | 31 bps | 16 |
+| Balanced | 1,800 s | 100 bps | 500 bps | 500 bps | 495 bps | 31 bps | 33 |
+| Aggressive | 600 s | 200 bps | 1,000 bps | 1,000 bps | 983 bps | 32 bps | 89 |
 
-The bounds are compounding accounting ceilings, not a spendable daily allowance. The conservative
-tier keeps a residual floor above zero; the two faster tiers can reach the full 10,000 bps ceiling
-under repeated maximum-loss rebalances.
+The largest charged step is 31, 31 and 32 bps against floors of 50, 100 and 200 bps in
+[`worst_case_loss.json`](../evidence/worst_case_loss.json). The local maximum-cost swaps do not reach
+the per-action floor, so the floor is a ceiling in this sample rather than an observed step size.
 
 The [`placebo_curators.json`](../evidence/placebo_curators.json) sample uses fixed seeds, exact-input
 swaps and shared local pools. `K` defaults to 30 and can be lowered with `K=n`; the published sample
 uses 30 placebos per cell, giving 180 runs across six scenarios. Every vault is checkpointed with
 `pokeAlpha()` after each price step, so a static or non-rebalancing curator still accrues alpha over
-the same intervals. The static mean stays at zero because that position matches its hold basket.
+the same intervals. Alpha statistics, dispersion, drawdown and loss figures are stored in hundredths
+of a bps.
 
 | Statistic | Value |
 | --- | --- |
-| Reactive mean | -16 bps |
-| Static mean | 0 bps |
-| Placebo mean | -12 bps |
-| Placebo standard deviation | 35 bps |
-| Reactive z-score | -11 × 100 |
+| Reactive mean | -1961 |
+| Static mean | -2 |
+| Placebo mean | -939 |
+| Placebo standard deviation | 2329 |
+| Placebo minimum | -12013 |
+| Placebo p25 | -1851 |
+| Placebo p50 | -193 |
+| Placebo p75 | 377 |
+| Placebo maximum | 3486 |
+| Reactive z-score × 100 | -43 |
+| Worst rebalance loss | 9599 |
+| Loss bound | 441108 |
+| Drawdown versus hold | 11707 |
 
 `reactiveVsPlaceboZScoreTimes100` is `(reactive mean − placebo mean) × 100 / placebo std`, stored as
-an integer. The reactive mean sits below the placebo mean by about 0.11 standard deviations, so no
-curator edge is claimed. This is a local stress comparison, not an estimate of live execution or fee
-income.
+an integer. The reactive mean sits below the placebo mean, so no curator edge is claimed. This is a
+local stress comparison, not an estimate of live execution or fee income.
 
 ## Other artifacts
 

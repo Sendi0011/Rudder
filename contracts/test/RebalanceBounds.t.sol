@@ -39,7 +39,8 @@ contract RebalanceBoundsTest is Test {
             maxTwapDistanceTicks: 1000,
             minRebalanceInterval: 10,
             maxPriceImpactBps: 100,
-            maxNavLossBps: -500
+            maxNavLossBps: -500,
+            maxDailyNavLossBps: 1000
         });
         registry.registerStrategy(env);
         vm.expectRevert(abi.encodeWithSelector(EnvelopeLib.InvalidRangeWidth.selector, 200, 100));
@@ -53,7 +54,8 @@ contract RebalanceBoundsTest is Test {
             maxTwapDistanceTicks: 1000,
             minRebalanceInterval: 60,
             maxPriceImpactBps: 50,
-            maxNavLossBps: -500
+            maxNavLossBps: -500,
+            maxDailyNavLossBps: 1000
         });
         registry.registerStrategy(env);
         vm.expectRevert(abi.encodeWithSelector(EnvelopeLib.IntervalTooShort.selector, 100, 150, 60));
@@ -67,7 +69,8 @@ contract RebalanceBoundsTest is Test {
             maxTwapDistanceTicks: 1000,
             minRebalanceInterval: 60,
             maxPriceImpactBps: 50,
-            maxNavLossBps: -500
+            maxNavLossBps: -500,
+            maxDailyNavLossBps: 1000
         });
         registry.registerStrategy(env);
         vm.expectRevert(abi.encodeWithSelector(EnvelopeLib.PriceImpactTooHigh.selector, 100, 50));
@@ -81,7 +84,8 @@ contract RebalanceBoundsTest is Test {
             maxTwapDistanceTicks: 1000,
             minRebalanceInterval: 60,
             maxPriceImpactBps: 50,
-            maxNavLossBps: -500
+            maxNavLossBps: -500,
+            maxDailyNavLossBps: 1000
         });
         registry.registerStrategy(env);
         vm.expectRevert(abi.encodeWithSelector(EnvelopeLib.NavLossTooLarge.selector, -1000, -500));

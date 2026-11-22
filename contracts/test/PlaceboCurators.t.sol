@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.26;
 
+import {Vm} from "forge-std/Vm.sol";
 import {RudderIntegrationBase} from "./RudderIntegrationBase.sol";
 import {RudderVault} from "../src/RudderVault.sol";
 import {IPoolManager} from "v4-core/interfaces/IPoolManager.sol";
@@ -28,9 +29,9 @@ contract PlaceboCuratorsTest is RudderIntegrationBase {
     int256[SCENARIOS] internal staticAlphas;
     mapping(address => uint256) internal peakRatio;
     mapping(PoolId => bool) internal poolInitialized;
-    uint256 internal worstLossBps;
-    uint256 internal lossBoundBps;
-    uint256 internal maxDrawdownBps;
+    uint256 internal worstRebalanceLossHundredths;
+    uint256 internal lossBoundHundredths;
+    uint256 internal maxDrawdownHundredths;
 
     function test_PlaceboCuratorDistribution() public {
         uint256 k = vm.envOr("K", uint256(30));
@@ -42,7 +43,8 @@ contract PlaceboCuratorsTest is RudderIntegrationBase {
             maxTwapDistanceTicks: 600,
             minRebalanceInterval: 60,
             maxPriceImpactBps: 1000,
-            maxNavLossBps: -100
+            maxNavLossBps: -100,
+            maxDailyNavLossBps: 200
         });
         Envelope memory widest = _envelope();
 
@@ -69,27 +71,29 @@ contract PlaceboCuratorsTest is RudderIntegrationBase {
         vm.serializeUint(obj, "placeboSamples", placeboAlphas.length);
         vm.serializeUint(obj, "regimes", uint256(3));
         vm.serializeUint(obj, "envelopes", uint256(2));
-        vm.serializeInt(obj, "reactiveMeanBps", reactiveMean);
-        vm.serializeInt(obj, "staticMeanBps", staticMean);
-        vm.serializeInt(obj, "placeboMeanBps", pMean);
+        vm.serializeInt(obj, "reactiveMeanBpsHundredths", reactiveMean);
+        vm.serializeInt(obj, "staticMeanBpsHundredths", staticMean);
+        vm.serializeInt(obj, "placeboMeanBpsHundredths", pMean);
         vm.serializeUint(obj, "zScoreScale", uint256(Z_SCORE_SCALE));
         vm.serializeInt(obj, "reactiveVsPlaceboZScoreTimes100", zScoreTimes100);
-        vm.serializeUint(obj, "placeboStdBps", pStd);
-        vm.serializeInt(obj, "placeboMinBps", pMin);
-        vm.serializeInt(obj, "placeboMaxBps", pMax);
-        vm.serializeInt(obj, "placeboP25Bps", p25);
-        vm.serializeInt(obj, "placeboP50Bps", p50);
-        vm.serializeInt(obj, "placeboP75Bps", p75);
+        vm.serializeUint(obj, "placeboStdBpsHundredths", pStd);
+        vm.serializeInt(obj, "placeboMinBpsHundredths", pMin);
+        vm.serializeInt(obj, "placeboMaxBpsHundredths", pMax);
+        vm.serializeInt(obj, "placeboP25BpsHundredths", p25);
+        vm.serializeInt(obj, "placeboP50BpsHundredths", p50);
+        vm.serializeInt(obj, "placeboP75BpsHundredths", p75);
         vm.serializeBool(obj, "reactiveBeatsPlaceboMean", reactiveWins);
-        vm.serializeUint(obj, "worstRebalanceLossBps", worstLossBps);
-        vm.serializeUint(obj, "lossBoundBps", lossBoundBps);
-        string memory json = vm.serializeUint(obj, "maxDrawdownVsHoldBps", maxDrawdownBps);
+        vm.serializeUint(obj, "worstRebalanceLossBpsHundredths", worstRebalanceLossHundredths);
+        vm.serializeUint(obj, "lossBoundBpsHundredths", lossBoundHundredths);
+        string memory json = vm.serializeUint(obj, "maxDrawdownVsHoldBpsHundredths", maxDrawdownHundredths);
         if (vm.envOr("WRITE_EVIDENCE", uint256(0)) != 0) {
             vm.writeJson(json, "evidence/placebo_curators.json");
         }
 
         assertGt(placeboAlphas.length, 0, "placebo sample must not be empty");
-        assertLe(worstLossBps, lossBoundBps, "rebalance loss must fit the compounded envelope bound");
+        assertLe(
+            worstRebalanceLossHundredths, lossBoundHundredths, "rebalance loss must fit the compounded envelope bound"
+        );
     }
 
     function _pool(uint24 fee) internal view returns (PoolKey memory pool) {
@@ -160,16 +164,16 @@ contract PlaceboCuratorsTest is RudderIntegrationBase {
             _observe(staticVault, pool);
         }
 
-        staticAlphas[index] = _bps(registry.getAlpha(staticId) - staticStart);
-        reactiveAlphas[index] = _bps(registry.getAlpha(reactiveId) - reactiveStart);
+        staticAlphas[index] = _bpsHundredths(registry.getAlpha(staticId) - staticStart);
+        reactiveAlphas[index] = _bpsHundredths(registry.getAlpha(reactiveId) - reactiveStart);
         for (uint256 i = 0; i < k; i++) {
-            placeboAlphas.push(_bps(registry.getAlpha(placeboIds[i]) - placeboStarts[i]));
+            placeboAlphas.push(_bpsHundredths(registry.getAlpha(placeboIds[i]) - placeboStarts[i]));
         }
 
         uint256 elapsed = block.timestamp - start;
         uint256 count = elapsed / env.minRebalanceInterval + 1;
-        uint256 scenarioBound = _compoundBound(_abs(env.maxNavLossBps), count);
-        if (scenarioBound > lossBoundBps) lossBoundBps = scenarioBound;
+        uint256 scenarioBound = _compoundBoundHundredths(_abs(env.maxNavLossBps) * 100, count);
+        if (scenarioBound > lossBoundHundredths) lossBoundHundredths = scenarioBound;
     }
 
     function _direction(uint256 regime, uint256 step) internal pure returns (bool) {
@@ -262,13 +266,24 @@ contract PlaceboCuratorsTest is RudderIntegrationBase {
     }
 
     function _tryRebalance(RudderVault v, PoolKey memory pool, int24 center) internal {
-        uint256 pre = v.totalAssetsValue();
-        vm.prank(curator);
-        v.rebalance(center - 300, center + 300);
-        uint256 post = v.totalAssetsValue();
-        uint256 loss = pre > post ? FullMath.mulDiv(pre - post, 10_000, pre) : 0;
-        if (loss > worstLossBps) worstLossBps = loss;
+        try this._callRebalance(v, center - 300, center + 300) returns (uint256 costMicroBps) {
+            uint256 hundredths = costMicroBps == 0 ? 0 : (costMicroBps + 9_999) / 10_000;
+            if (hundredths > worstRebalanceLossHundredths) worstRebalanceLossHundredths = hundredths;
+        } catch {}
         _observe(v, pool);
+    }
+
+    function _callRebalance(RudderVault v, int24 lo, int24 hi) external returns (uint256 costMicroBps) {
+        vm.recordLogs();
+        vm.prank(curator);
+        v.rebalance(lo, hi);
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        for (uint256 i; i < logs.length; i++) {
+            if (logs[i].topics[0] == keccak256("LossBucketUpdated(uint256,uint256,uint256)")) {
+                (costMicroBps,) = abi.decode(logs[i].data, (uint256, uint256));
+                return costMicroBps;
+            }
+        }
     }
 
     function _observe(RudderVault v, PoolKey memory pool) internal {
@@ -283,14 +298,14 @@ contract PlaceboCuratorsTest is RudderIntegrationBase {
             peakRatio[address(v)] = ratio;
             return;
         }
-        uint256 drawdown = FullMath.mulDiv(peak - ratio, 10_000, peak);
-        if (drawdown > maxDrawdownBps) maxDrawdownBps = drawdown;
+        uint256 drawdown = FullMath.mulDiv(peak - ratio, 1_000_000, peak);
+        if (drawdown > maxDrawdownHundredths) maxDrawdownHundredths = drawdown;
     }
 
-    function _bps(int256 alpha) internal pure returns (int256) {
+    function _bpsHundredths(int256 alpha) internal pure returns (int256) {
         uint256 magnitude = _abs(alpha);
-        uint256 bps = FullMath.mulDiv(magnitude, 10_000, 1e18);
-        return alpha < 0 ? -int256(bps) : int256(bps);
+        uint256 hundredths = FullMath.mulDiv(magnitude, 1_000_000, 1e18);
+        return alpha < 0 ? -int256(hundredths) : int256(hundredths);
     }
 
     function _abs(int256 value) internal pure returns (uint256) {
@@ -352,11 +367,11 @@ contract PlaceboCuratorsTest is RudderIntegrationBase {
         return lo - 1;
     }
 
-    function _compoundBound(uint256 lossCapBps, uint256 count) internal pure returns (uint256) {
-        uint256 surviving = 10_000;
+    function _compoundBoundHundredths(uint256 lossCapHundredths, uint256 count) internal pure returns (uint256) {
+        uint256 surviving = 10_000_000;
         for (uint256 i = 0; i < count; i++) {
-            surviving = FullMath.mulDiv(surviving, 10_000 - lossCapBps, 10_000);
+            surviving = FullMath.mulDiv(surviving, 10_000_000 - lossCapHundredths, 10_000_000);
         }
-        return 10_000 - surviving;
+        return 10_000_000 - surviving;
     }
 }

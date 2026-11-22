@@ -5,8 +5,8 @@ an on-chain mandate (an *envelope*); LPs never relinquish custody. Exit always w
 badness never blocks withdrawals. <!-- claim:RUD-001 -->
 
 - **Curator steers, never custodies.** A curator can only move the position inside bounds enforced
-  by `EnvelopeLib` — range width, centre shift, rebalance interval, price impact, NAV loss, and
-  distance from the TWAP tick. Every violation reverts. <!-- claim:RUD-002 -->
+  by `EnvelopeLib` — range width, centre shift, rebalance interval, price impact, NAV loss, daily
+  NAV-loss budget, and distance from the TWAP tick. Every violation reverts. <!-- claim:RUD-002 -->
 - **Manipulation-resistant oracle.** `RudderHook` samples prices in `beforeSwap` (the pre-swap
   price), one sample per timestamp, and serves a time-weighted average. A swapper cannot choose the
   price it is recorded at. <!-- claim:RUD-003 -->
@@ -67,16 +67,16 @@ Local measurements from `FOUNDRY_PROFILE=ci forge test --match-contract Evidence
   ([`evidence/rebalance_alpha_cost.json`](evidence/rebalance_alpha_cost.json)). <!-- claim:RUD-012 -->
 - Churn ranking: across **3** rebalances the ranking gap was **200** bps against **249** bps summed cost
   ([`evidence/churner_alpha.json`](evidence/churner_alpha.json)). <!-- claim:RUD-013 -->
-- Rebalance bound: a **500** bps per-rebalance floor over **30** seconds at a **10**-second interval allowed
-  **1,856** bps across **4** rebalances; measured loss was **73** bps across **3** charged rebalances.
-  For an **86,400**-second horizon, tiers with **200** bps floors at **3,600** seconds, **500** bps at
-  **1,800** seconds and **500** bps at **600** seconds allow **3,975**, **9,197** and **10,000** bps
-  across **25**, **49** and **145** rebalances
-  ([`evidence/worst_case_loss.json`](evidence/worst_case_loss.json)). <!-- claim:RUD-029 -->
+- Daily budget: over an **86,400**-second horizon, the conservative tier pairs a **50** bps NAV-loss
+  floor and **3,600**-second interval with a **200** bps budget, **200** bps bound, **198** bps observed
+  across **16** rebalances; balanced uses **100** bps, **1,800** seconds, **500** bps, **500** bps,
+  **495** bps and **33**; aggressive uses **200** bps, **600** seconds, **1,000** bps, **1,000** bps,
+  **983** bps and **89**
+  ([`evidence/worst_case_loss.json`](evidence/worst_case_loss.json)). <!-- claim:RUD-029 --> <!-- claim:RUD-032 -->
 - Curator sample: **30** random curators per cell (**180** placebo samples) over **3** regimes and **2**
-  envelopes saw a **-16** bps reactive mean, **0** bps static mean and **-12** bps placebo mean, with
-  **35** bps dispersion, a z-score scaled by **100** of **-11**, worst loss **90** bps against a
-  **3,701** bps bound and **284** bps drawdown
+  envelopes saw reactive **-1961**, static **-2** and placebo **-939** hundredths of a bps, with placebo
+  dispersion **2329**, min **-12013**, p25 **-1851**, p50 **-193**, p75 **377**, max **3486**, z-score
+  scaled by **100** of **-43**, worst loss **9599** against a **441108** bound and **11707** drawdown
   ([`evidence/placebo_curators.json`](evidence/placebo_curators.json)). <!-- claim:RUD-030 -->
 
 Fork test against a live network (skipped when the RPC is unset): <!-- claim:RUD-014 -->

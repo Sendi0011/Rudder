@@ -1,22 +1,32 @@
 {
-  "aggressiveBoundBps": 10000,
-  "aggressiveBoundRebalances": 145,
-  "aggressiveIntervalSeconds": 600,
-  "aggressiveLossCapBps": 500,
-  "balancedBoundBps": 9197,
-  "balancedBoundRebalances": 49,
-  "balancedIntervalSeconds": 1800,
-  "balancedLossCapBps": 500,
-  "boundBps": 1856,
-  "boundRebalances": 4,
-  "chargedRebalances": 3,
-  "conservativeBoundBps": 3975,
-  "conservativeBoundRebalances": 25,
-  "conservativeIntervalSeconds": 3600,
-  "conservativeLossCapBps": 200,
-  "elapsedSeconds": 30,
-  "horizonSeconds": 86400,
-  "intervalSeconds": 10,
-  "lossCapBps": 500,
-  "observedLossBps": 73
+  "conservative": {
+    "IntervalSeconds": 3600,
+    "NavLossFloorBps": 50,
+    "DailyBudgetBps": 200,
+    "HorizonSeconds": 86400,
+    "BoundBps": 200,
+    "ObservedBps": 198,
+    "MaxObservedCostBps": 31,
+    "Rebalances": 16
+  },
+  "balanced": {
+    "IntervalSeconds": 1800,
+    "NavLossFloorBps": 100,
+    "DailyBudgetBps": 500,
+    "HorizonSeconds": 86400,
+    "BoundBps": 500,
+    "ObservedBps": 495,
+    "MaxObservedCostBps": 31,
+    "Rebalances": 33
+  },
+  "aggressive": {
+    "IntervalSeconds": 600,
+    "NavLossFloorBps": 200,
+    "DailyBudgetBps": 1000,
+    "HorizonSeconds": 86400,
+    "BoundBps": 1000,
+    "ObservedBps": 983,
+    "MaxObservedCostBps": 32,
+    "Rebalances": 89
+  }
 }

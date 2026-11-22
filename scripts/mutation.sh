@@ -89,6 +89,12 @@ MUTATIONS=(
     registry_failure_exit_independence
     oracle_one_sample_per_timestamp
     poke_alpha_removes_accrue
+    bucket_check_removed
+    bucket_refill_doubled
+    bucket_capacity_doubled
+    registry_budget_validation_skipped
+    is_tighter_ignores_budget
+    bucket_cost_round_down
 )
 
 TESTS=(
@@ -121,6 +127,12 @@ TESTS=(
     test_WithdrawWithRegistryRevertPaysProRata
     test_OneSamplePerBlock
     test_PokeAlphaAccruesWithoutFlow
+    test_ExhaustedBucketBlocksWithSpecificError
+    test_BucketRefillsAtDailyRateAndRoundsUpCost
+    test_ExhaustedBucketBlocksWithSpecificError
+    test_QueuedLoosenRejectsInvalidDailyBudget
+    test_IsTighterTreatsSmallerBudgetAsTighter
+    test_BucketRefillsAtDailyRateAndRoundsUpCost
 )
 
 find_test() {
@@ -303,6 +315,44 @@ patches = {
         """        _clearPriceCache();
         _rebaseAlphaBaseline();
         emit AlphaPoked(msg.sender, cumulativeAlpha);""",
+    ),
+    "bucket_check_removed": (
+        "contracts/src/RudderVault.sol",
+        """        uint256 bucketAfter = bucket + cost;
+        if (bucketAfter > capacity) revert DailyNavLossBudgetExceeded(bucket, cost, capacity);
+        lossBucket = bucketAfter;""",
+        """        uint256 bucketAfter = bucket + cost;
+        {}
+        lossBucket = bucketAfter;""",
+    ),
+    "bucket_refill_doubled": (
+        "contracts/src/RudderVault.sol",
+        """            uint256 refill = uint256(nowTs - lastBucketUpdate) * refillPerSecond;""",
+        """            uint256 refill = uint256(nowTs - lastBucketUpdate) * refillPerSecond * 2;""",
+    ),
+    "bucket_capacity_doubled": (
+        "contracts/src/RudderVault.sol",
+        """        uint256 capacity = (uint256(budgetBps) * 1_000_000) / 2;""",
+        """        uint256 capacity = uint256(budgetBps) * 1_000_000;""",
+    ),
+    "registry_budget_validation_skipped": (
+        "contracts/src/StrategyRegistry.sol",
+        """        if (strategies[id].curator != msg.sender) revert Unauthorized();
+        EnvelopeLib.validate(newEnv);
+        uint256 unlockTime = block.timestamp + LOOSEN_DELAY;""",
+        """        if (strategies[id].curator != msg.sender) revert Unauthorized();
+        {}
+        uint256 unlockTime = block.timestamp + LOOSEN_DELAY;""",
+    ),
+    "is_tighter_ignores_budget": (
+        "contracts/src/libraries/EnvelopeLib.sol",
+        """            && next.maxDailyNavLossBps <= current.maxDailyNavLossBps;""",
+        """            && true;""",
+    ),
+    "bucket_cost_round_down": (
+        "contracts/src/RudderVault.sol",
+        """            cost = FullMath.mulDivRoundingUp(preNav - postNav, 10_000_000_000, preNav);""",
+        """            cost = FullMath.mulDiv(preNav - postNav, 10_000_000_000, preNav);""",
     ),
 }
 

@@ -12,13 +12,16 @@ struct Envelope {
     uint32 minRebalanceInterval;
     uint32 maxPriceImpactBps;
     int24 maxNavLossBps;
+    uint32 maxDailyNavLossBps;
 }
 
 /// @title EnvelopeLib
 /// @notice Validation and strictness comparison for envelopes. "Stricter" means each field is at
-///         least as restrictive: caps shrink, floors rise, minimums grow.
+///         least as restrictive: caps shrink, floors rise, minimums grow, and the daily loss budget
+///         shrinks.
 library EnvelopeLib {
     int24 internal constant PROTOCOL_MAX_NAV_LOSS_BPS = 500;
+    uint32 internal constant PROTOCOL_MAX_DAILY_NAV_LOSS_BPS = 1000;
 
     error InvalidParams();
     error NotTighter();
@@ -28,6 +31,9 @@ library EnvelopeLib {
     error PriceImpactTooHigh(uint32 impactBps, uint32 maxPriceImpactBps);
     error NavLossTooLarge(int24 lossBps, int24 maxNavLossBps);
     error NavLossFloorTooLow(int24 floor, int24 minFloor);
+    error DailyNavLossBudgetTooHigh(uint32 budget, uint32 cap);
+    error ZeroDailyNavLossBudget();
+    error NavLossFloorExceedsBudget(int24 floor, uint32 budget);
 
     /// @notice Reject degenerate envelopes: caps must be positive, intervals nonzero, and the
     ///         impact/loss bounds within their natural ranges.
@@ -41,6 +47,13 @@ library EnvelopeLib {
         if (e.maxNavLossBps < -PROTOCOL_MAX_NAV_LOSS_BPS) {
             revert NavLossFloorTooLow(e.maxNavLossBps, -PROTOCOL_MAX_NAV_LOSS_BPS);
         }
+        if (e.maxDailyNavLossBps == 0) revert ZeroDailyNavLossBudget();
+        if (e.maxDailyNavLossBps > PROTOCOL_MAX_DAILY_NAV_LOSS_BPS) {
+            revert DailyNavLossBudgetTooHigh(e.maxDailyNavLossBps, PROTOCOL_MAX_DAILY_NAV_LOSS_BPS);
+        }
+        if (uint256(uint24(-e.maxNavLossBps)) > uint256(e.maxDailyNavLossBps) / 2) {
+            revert NavLossFloorExceedsBudget(e.maxNavLossBps, e.maxDailyNavLossBps);
+        }
     }
 
     /// @notice True if every field of `next` is at least as strict as `current`. Instant tightening
@@ -49,7 +62,8 @@ library EnvelopeLib {
         return next.maxRangeWidth <= current.maxRangeWidth && next.maxCenterShift <= current.maxCenterShift
             && next.maxTwapDistanceTicks <= current.maxTwapDistanceTicks
             && next.minRebalanceInterval >= current.minRebalanceInterval
-            && next.maxPriceImpactBps <= current.maxPriceImpactBps && next.maxNavLossBps >= current.maxNavLossBps;
+            && next.maxPriceImpactBps <= current.maxPriceImpactBps && next.maxNavLossBps >= current.maxNavLossBps
+            && next.maxDailyNavLossBps <= current.maxDailyNavLossBps;
     }
 
     function validateRangeWidth(int24 width, int24 maxWidth) internal pure {

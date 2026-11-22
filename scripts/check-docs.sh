@@ -61,41 +61,45 @@ fields = {
         ["churner_alpha.json:summedCostBps"],
     ],
     "worst_case_loss.json": [
-        ["worst_case_loss.json:lossCapBps"],
-        ["worst_case_loss.json:elapsedSeconds"],
-        ["worst_case_loss.json:intervalSeconds"],
-        ["worst_case_loss.json:boundBps"],
-        ["worst_case_loss.json:boundRebalances"],
-        ["worst_case_loss.json:observedLossBps"],
-        ["worst_case_loss.json:chargedRebalances"],
-        ["worst_case_loss.json:horizonSeconds"],
-        ["worst_case_loss.json:conservativeLossCapBps"],
-        ["worst_case_loss.json:conservativeIntervalSeconds"],
-        ["worst_case_loss.json:balancedLossCapBps"],
-        ["worst_case_loss.json:balancedIntervalSeconds"],
-        ["worst_case_loss.json:aggressiveLossCapBps"],
-        ["worst_case_loss.json:aggressiveIntervalSeconds"],
-        ["worst_case_loss.json:conservativeBoundBps"],
-        ["worst_case_loss.json:balancedBoundBps"],
-        ["worst_case_loss.json:aggressiveBoundBps"],
-        ["worst_case_loss.json:conservativeBoundRebalances"],
-        ["worst_case_loss.json:balancedBoundRebalances"],
-        ["worst_case_loss.json:aggressiveBoundRebalances"],
+        ["worst_case_loss.json:conservative.HorizonSeconds"],
+        ["worst_case_loss.json:conservative.NavLossFloorBps"],
+        ["worst_case_loss.json:conservative.IntervalSeconds"],
+        ["worst_case_loss.json:conservative.DailyBudgetBps"],
+        ["worst_case_loss.json:conservative.BoundBps"],
+        ["worst_case_loss.json:conservative.ObservedBps"],
+        ["worst_case_loss.json:conservative.Rebalances"],
+        ["worst_case_loss.json:balanced.NavLossFloorBps"],
+        ["worst_case_loss.json:balanced.IntervalSeconds"],
+        ["worst_case_loss.json:balanced.DailyBudgetBps"],
+        ["worst_case_loss.json:balanced.BoundBps"],
+        ["worst_case_loss.json:balanced.ObservedBps"],
+        ["worst_case_loss.json:balanced.Rebalances"],
+        ["worst_case_loss.json:aggressive.NavLossFloorBps"],
+        ["worst_case_loss.json:aggressive.IntervalSeconds"],
+        ["worst_case_loss.json:aggressive.DailyBudgetBps"],
+        ["worst_case_loss.json:aggressive.BoundBps"],
+        ["worst_case_loss.json:aggressive.ObservedBps"],
+        ["worst_case_loss.json:aggressive.Rebalances"],
     ],
     "placebo_curators.json": [
         ["placebo_curators.json:k"],
         ["placebo_curators.json:placeboSamples"],
         ["placebo_curators.json:regimes"],
         ["placebo_curators.json:envelopes"],
-        ["placebo_curators.json:reactiveMeanBps"],
-        ["placebo_curators.json:staticMeanBps"],
-        ["placebo_curators.json:placeboMeanBps"],
-        ["placebo_curators.json:placeboStdBps"],
+        ["placebo_curators.json:reactiveMeanBpsHundredths"],
+        ["placebo_curators.json:staticMeanBpsHundredths"],
+        ["placebo_curators.json:placeboMeanBpsHundredths"],
+        ["placebo_curators.json:placeboStdBpsHundredths"],
+        ["placebo_curators.json:placeboMinBpsHundredths"],
+        ["placebo_curators.json:placeboP25BpsHundredths"],
+        ["placebo_curators.json:placeboP50BpsHundredths"],
+        ["placebo_curators.json:placeboP75BpsHundredths"],
+        ["placebo_curators.json:placeboMaxBpsHundredths"],
         ["placebo_curators.json:zScoreScale"],
         ["placebo_curators.json:reactiveVsPlaceboZScoreTimes100"],
-        ["placebo_curators.json:worstRebalanceLossBps"],
-        ["placebo_curators.json:lossBoundBps"],
-        ["placebo_curators.json:maxDrawdownVsHoldBps"],
+        ["placebo_curators.json:worstRebalanceLossBpsHundredths"],
+        ["placebo_curators.json:lossBoundBpsHundredths"],
+        ["placebo_curators.json:maxDrawdownVsHoldBpsHundredths"],
     ],
 }
 
@@ -128,9 +132,12 @@ def expected(spec):
         if not path.exists():
             raise SystemExit(f"missing evidence file: evidence/{filename}")
         cache[filename] = json.loads(path.read_text(encoding="utf-8"))
-    if field not in cache[filename]:
-        raise SystemExit(f"missing field: evidence/{filename}:{field}")
-    return cache[filename][field]
+    value = cache[filename]
+    for part in field.split("."):
+        if part not in value:
+            raise SystemExit(f"missing field: evidence/{filename}:{field}")
+        value = value[part]
+    return value
 
 
 failures = []

@@ -89,7 +89,8 @@ contract Seed is Script {
             maxTwapDistanceTicks: 1200,
             minRebalanceInterval: 3600,
             maxPriceImpactBps: 200,
-            maxNavLossBps: -200
+            maxNavLossBps: -50,
+            maxDailyNavLossBps: 200
         });
         envelopes[1] = Envelope({
             maxRangeWidth: 2400,
@@ -97,7 +98,8 @@ contract Seed is Script {
             maxTwapDistanceTicks: 2400,
             minRebalanceInterval: 1800,
             maxPriceImpactBps: 500,
-            maxNavLossBps: -500
+            maxNavLossBps: -100,
+            maxDailyNavLossBps: 500
         });
         envelopes[2] = Envelope({
             maxRangeWidth: 4800,
@@ -105,7 +107,8 @@ contract Seed is Script {
             maxTwapDistanceTicks: 4800,
             minRebalanceInterval: 600,
             maxPriceImpactBps: 1000,
-            maxNavLossBps: -500
+            maxNavLossBps: -200,
+            maxDailyNavLossBps: 1000
         });
 
         int24[3] memory lowers = [int24(-600), int24(-1200), int24(-2400)];

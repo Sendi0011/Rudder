@@ -83,7 +83,8 @@ contract ForkLifecycleTest is Test {
             maxTwapDistanceTicks: 6000,
             minRebalanceInterval: 1,
             maxPriceImpactBps: 10_000,
-            maxNavLossBps: -500
+            maxNavLossBps: -500,
+            maxDailyNavLossBps: 1000
         });
         strategyId = registry.registerStrategy(env);
 
