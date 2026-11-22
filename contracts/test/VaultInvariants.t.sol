@@ -2,6 +2,7 @@
 pragma solidity 0.8.26;
 
 import {Test} from "forge-std/Test.sol";
+import {Vm} from "forge-std/Vm.sol";
 import {console2} from "forge-std/console2.sol";
 import {RudderIntegrationBase} from "./RudderIntegrationBase.sol";
 import {RudderVault} from "../src/RudderVault.sol";
@@ -185,6 +186,8 @@ contract VaultHandler is Test {
     uint256 public postNav;
     int24 public maxNavLossBps;
     bool public hasRebalanced;
+    uint256[] internal costTimes;
+    uint256[] internal costAmounts;
 
     function rebalance(uint256 seed) public {
         uint32 minInterval = registry.getEnvelope(strategyId).minRebalanceInterval;
@@ -196,13 +199,31 @@ contract VaultHandler is Test {
         (int24 lo, int24 hi) = (center - halfWidth, center + halfWidth);
 
         preNav = vault.totalAssetsValue();
+        vm.recordLogs();
         vm.prank(curator);
         vault.rebalance(lo, hi);
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        for (uint256 i; i < logs.length; i++) {
+            if (logs[i].topics[0] == keccak256("LossBucketUpdated(uint256,uint256,uint256)")) {
+                (uint256 cost,) = abi.decode(logs[i].data, (uint256, uint256));
+                costTimes.push(block.timestamp);
+                costAmounts.push(cost);
+                break;
+            }
+        }
         postNav = vault.totalAssetsValue();
         maxNavLossBps = registry.getEnvelope(strategyId).maxNavLossBps;
         hasRebalanced = true;
         ghostRebalances++;
         totalCalls++;
+    }
+
+    function costCount() external view returns (uint256) {
+        return costTimes.length;
+    }
+
+    function costAt(uint256 index) external view returns (uint256 ts, uint256 cost) {
+        return (costTimes[index], costAmounts[index]);
     }
 }
 
@@ -295,6 +316,27 @@ contract VaultInvariantsTest is RudderIntegrationBase {
         uint256 allowedBps = maxLoss < 0 ? uint256(-int256(maxLoss)) : 0;
         uint256 floor = pre - (pre * allowedBps) / 10_000;
         assertGe(post + 1, floor, "rebalance loss exceeds envelope");
+    }
+
+    function invariant_LossBucketWithinCapacity() public view {
+        Envelope memory env = registry.getEnvelope(strategyId);
+        uint256 capacity = (uint256(env.maxDailyNavLossBps) * 1_000_000) / 2;
+        assertLe(vault.lossBucket(), capacity, "bucket exceeds capacity");
+    }
+
+    function invariant_RollingLossBudgetRespected() public view {
+        Envelope memory env = registry.getEnvelope(strategyId);
+        uint256 budget = uint256(env.maxDailyNavLossBps) * 1_000_000;
+        uint256 count = handler.costCount();
+        for (uint256 i; i < count; i++) {
+            (uint256 start,) = handler.costAt(i);
+            uint256 total;
+            for (uint256 j; j < count; j++) {
+                (uint256 ts, uint256 cost) = handler.costAt(j);
+                if (ts >= start && ts <= start + 86_400) total += cost;
+            }
+            assertLe(total, budget, "rolling loss exceeds budget");
+        }
     }
 
     /// @notice Solvency: the vault's real holdings (idle + position, valued at the same TWAP the vault

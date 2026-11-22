@@ -55,6 +55,7 @@ contract RudderVault is Initializable, ERC20, ReentrancyGuard, IUnlockCallback {
     error TokenNotERC20();
     error SettlementMismatch();
     error SpotTwapDeviation();
+    error DailyNavLossBudgetExceeded(uint256 bucket, uint256 cost, uint256 capacity);
 
     struct Basket {
         uint256 amount0;
@@ -125,6 +126,9 @@ contract RudderVault is Initializable, ERC20, ReentrancyGuard, IUnlockCallback {
     ///         Measured in sqrt-price basis points (about double in price terms).
     uint32 public constant PROTOCOL_MAX_PRICE_IMPACT_BPS = 50;
     uint256 public lastRebalanceTimestamp;
+    /// @notice Rebalance-induced NAV loss charged in micro-bps (bps scaled by 1e6).
+    uint256 public lossBucket;
+    uint48 public lastBucketUpdate;
 
     event Deposit(address indexed sender, address indexed recipient, uint256 amount0, uint256 amount1, uint256 shares);
     event Withdraw(
@@ -137,6 +141,7 @@ contract RudderVault is Initializable, ERC20, ReentrancyGuard, IUnlockCallback {
         uint256 fee1
     );
     event Rebalance(uint256 indexed strategyId, int24 tickLower, int24 tickUpper, uint128 liquidity);
+    event LossBucketUpdated(uint256 indexed strategyId, uint256 costMicroBps, uint256 bucketAfterMicroBps);
     event FeesClaimed(address indexed recipient, uint256 amount0, uint256 amount1);
     event AlphaPoked(address indexed caller, int256 cumulativeAlpha);
 
@@ -182,6 +187,7 @@ contract RudderVault is Initializable, ERC20, ReentrancyGuard, IUnlockCallback {
         feeCapBps = _feeCapBps > PROTOCOL_MAX_FEE_BPS ? uint16(PROTOCOL_MAX_FEE_BPS) : _feeCapBps;
         initialEnvelope = _envelope;
         lastRebalanceTimestamp = uint48(block.timestamp);
+        lastBucketUpdate = uint48(block.timestamp);
     }
 
     modifier whenNotPaused() {
@@ -445,6 +451,7 @@ contract RudderVault is Initializable, ERC20, ReentrancyGuard, IUnlockCallback {
 
         uint256 postNav = _totalAssetsValue();
         EnvelopeLib.validateNavLoss(_navLossBps(preNav, postNav), env.maxNavLossBps);
+        _chargeLossBucket(env.maxDailyNavLossBps, preNav, postNav);
 
         // Deposits and withdrawals accrue before their funds move; a rebalance accrues after the
         // swap so its realized cost is charged to alpha instead of being erased by the rebase.
@@ -453,6 +460,30 @@ contract RudderVault is Initializable, ERC20, ReentrancyGuard, IUnlockCallback {
         lastRebalanceTimestamp = uint48(block.timestamp);
         _rebaseAlphaBaseline();
         emit Rebalance(strategyId, newTickLower, newTickUpper, positionLiquidity);
+    }
+
+    /// @dev Leaky bucket over rebalance-induced NAV loss. The bucket holds micro-bps of pre-rebalance
+    ///      NAV, refills at capacity per day, and charges the rounded-up loss after the swap. A
+    ///      blocked charge reverts the whole rebalance. Deposits, withdrawals and alpha poking never
+    ///      call this; a tighter budget lowers capacity without clamping the stored bucket.
+    function _chargeLossBucket(uint32 budgetBps, uint256 preNav, uint256 postNav) internal {
+        uint256 capacity = (uint256(budgetBps) * 1_000_000) / 2;
+        uint256 refillPerSecond = capacity / 86_400;
+        uint256 bucket = lossBucket;
+        uint48 nowTs = uint48(block.timestamp);
+        if (nowTs > lastBucketUpdate) {
+            uint256 refill = uint256(nowTs - lastBucketUpdate) * refillPerSecond;
+            bucket = bucket > refill ? bucket - refill : 0;
+        }
+        uint256 cost;
+        if (preNav > 0 && postNav < preNav) {
+            cost = FullMath.mulDivRoundingUp(preNav - postNav, 10_000_000_000, preNav);
+        }
+        uint256 bucketAfter = bucket + cost;
+        if (bucketAfter > capacity) revert DailyNavLossBudgetExceeded(bucket, cost, capacity);
+        lossBucket = bucketAfter;
+        lastBucketUpdate = nowTs;
+        emit LossBucketUpdated(strategyId, cost, bucketAfter);
     }
 
     /// @dev Exact-input swap of `amountIn` of the input side, bounded so the spot cannot move more
