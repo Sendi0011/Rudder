@@ -40,9 +40,9 @@ budget. The seeded floors, budgets, intervals and bounds are recorded in
 [`evidence/worst_case_loss.json`](../evidence/worst_case_loss.json).
 
 `RudderVault` charges each rebalance to a per-vault leaky bucket after the NAV-loss floor passes. The
-bucket starts with half the budget, refills that amount over the horizon recorded in
-[`evidence/worst_case_loss.json`](../evidence/worst_case_loss.json), and rejects a rebalance whose
-rounded-up charge would exceed capacity. A tighter budget lowers capacity immediately without
+bucket starts at zero; its capacity is half the budget and it refills that capacity over the horizon
+recorded in [`evidence/worst_case_loss.json`](../evidence/worst_case_loss.json). It rejects a rebalance
+whose rounded-up charge would exceed capacity. A tighter budget lowers capacity immediately without
 clamping the stored bucket; a looser budget must clear the existing timelock. Deposits, withdrawals
 and alpha poking never consult the bucket. The parameter choice and the rejected fixed-window reset
 are recorded in [`ADR-004`](adr/ADR-004-daily-loss-budget.md).

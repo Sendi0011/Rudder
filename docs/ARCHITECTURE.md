@@ -42,6 +42,21 @@ curator-operated vaults that steer a single LP range inside an on-chain mandate.
   maintains a manipulation-resistant TWAP from pre-swap prices. Removals are never gated.
 - **`VaultMigrator`** moves an LP between two vaults of the same pool in one transaction.
 
+## Envelope fields
+
+| Field | Bound |
+| --- | --- |
+| `maxRangeWidth` | Maximum tick width of the live position |
+| `maxCenterShift` | Maximum move of the range centre against the TWAP tick |
+| `minRebalanceInterval` | Minimum seconds between rebalances |
+| `maxTwapDistanceTicks` | Maximum distance between the range centre and the TWAP tick |
+| `maxPriceImpactBps` | Maximum swap price impact |
+| `maxNavLossBps` | Maximum TWAP NAV loss charged to one rebalance |
+| `maxDailyNavLossBps` | Maximum cumulative TWAP NAV loss charged in a rolling day |
+
+`StrategyRegistry` validates every field on registration, tightening and queued loosening. The vault
+reads the live envelope on each rebalance and charges `maxDailyNavLossBps` to a leaky bucket.
+
 ## Invariants
 
 - A vault's holdings (idle + position valued at the TWAP) always cover LP NAV plus curator pending

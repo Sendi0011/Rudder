@@ -5,8 +5,8 @@ an on-chain mandate (an *envelope*); LPs never relinquish custody. Exit always w
 badness never blocks withdrawals. <!-- claim:RUD-001 -->
 
 - **Curator steers, never custodies.** A curator can only move the position inside bounds enforced
-  by `EnvelopeLib` — range width, centre shift, rebalance interval, price impact, NAV loss, and
-  distance from the TWAP tick. Every violation reverts. <!-- claim:RUD-002 -->
+  by `EnvelopeLib` — range width, centre shift, rebalance interval, price impact, NAV loss, daily
+  NAV-loss budget, and distance from the TWAP tick. Every violation reverts. <!-- claim:RUD-002 -->
 - **Manipulation-resistant oracle.** `RudderHook` samples prices in `beforeSwap` (the pre-swap
   price), one sample per timestamp, and serves a time-weighted average. A swapper cannot choose the
   price it is recorded at. <!-- claim:RUD-003 -->

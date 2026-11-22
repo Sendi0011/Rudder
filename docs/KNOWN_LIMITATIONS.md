@@ -26,8 +26,9 @@ each item is either an accepted design trade-off or work that is not yet done.
 ## What the envelope costs
 
 - **Reaction is paced by the envelope.** After the first range-set, a curator cannot re-centre faster
-  than `minRebalanceInterval` and cannot move the centre farther than `maxCenterShift` in one step.
-  A fast price path can outrun the range between allowed rebalances.
+  than `minRebalanceInterval`, cannot move the centre farther than `maxCenterShift` in one step and
+  cannot continue once the daily budget is spent. A fast price path can outrun the range between
+  allowed rebalances.
 - **The tiers trade speed for protection.** Tighter envelopes lengthen the interval and shorten the
   allowed range, which reduces the room to act and the frequency of action at the same time. Looser
   envelopes buy responsiveness by allowing wider ranges and larger per-step loss.
@@ -35,6 +36,9 @@ each item is either an accepted design trade-off or work that is not yet done.
   rebalance; it does not cap market-price moves, fee opportunity cost or rounding in favor of LPs.
   The seeded budgets and observed charged loss are in
   [`evidence/worst_case_loss.json`](../evidence/worst_case_loss.json).
+- **Tightening can leave the bucket above capacity.** A smaller budget lowers capacity immediately and
+  does not clamp the stored charge, so rebalances stay blocked until time refills enough room. The
+  choice is recorded in [`ADR-004`](adr/ADR-004-daily-loss-budget.md).
 
 ## Resolved
 

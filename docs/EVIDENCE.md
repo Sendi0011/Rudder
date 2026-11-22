@@ -38,11 +38,15 @@ charged loss and rebalance count over the horizon in
 `LossBucketUpdated` costs rounded up to whole bps, and `BoundBps` is the daily budget. A rebalance
 that is rejected by the bucket is not counted. These are accounting figures, not market drawdown.
 
-| Tier | Interval | NAV-loss floor | Daily budget | Bound | Observed | Rebalances |
-| --- | --- | --- | --- | --- | --- | --- |
-| Conservative | 3,600 s | 50 bps | 200 bps | 200 bps | 198 bps | 16 |
-| Balanced | 1,800 s | 100 bps | 500 bps | 500 bps | 495 bps | 33 |
-| Aggressive | 600 s | 200 bps | 1,000 bps | 1,000 bps | 983 bps | 89 |
+| Tier | Interval | NAV-loss floor | Daily budget | Bound | Observed | Max charged step | Rebalances |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Conservative | 3,600 s | 50 bps | 200 bps | 200 bps | 198 bps | 31 bps | 16 |
+| Balanced | 1,800 s | 100 bps | 500 bps | 500 bps | 495 bps | 31 bps | 33 |
+| Aggressive | 600 s | 200 bps | 1,000 bps | 1,000 bps | 983 bps | 32 bps | 89 |
+
+The largest charged step is 31, 31 and 32 bps against floors of 50, 100 and 200 bps in
+[`worst_case_loss.json`](../evidence/worst_case_loss.json). The local maximum-cost swaps do not reach
+the per-action floor, so the floor is a ceiling in this sample rather than an observed step size.
 
 The [`placebo_curators.json`](../evidence/placebo_curators.json) sample uses fixed seeds, exact-input
 swaps and shared local pools. `K` defaults to 30 and can be lowered with `K=n`; the published sample
