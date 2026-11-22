@@ -42,7 +42,8 @@ contract PlaceboCuratorsTest is RudderIntegrationBase {
             maxTwapDistanceTicks: 600,
             minRebalanceInterval: 60,
             maxPriceImpactBps: 1000,
-            maxNavLossBps: -100
+            maxNavLossBps: -100,
+            maxDailyNavLossBps: 200
         });
         Envelope memory widest = _envelope();
 

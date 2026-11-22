@@ -21,7 +21,8 @@ contract RegistryTest is Test {
             maxTwapDistanceTicks: 1000,
             minRebalanceInterval: 60,
             maxPriceImpactBps: 50,
-            maxNavLossBps: -500
+            maxNavLossBps: -500,
+            maxDailyNavLossBps: 1000
         });
     }
 
@@ -47,6 +48,38 @@ contract RegistryTest is Test {
         registry.registerStrategy(e);
     }
 
+    function test_RegisterRejectsInvalidDailyBudget() public {
+        Envelope memory e = _env();
+        e.maxDailyNavLossBps = 1001;
+        vm.prank(curator);
+        vm.expectRevert(abi.encodeWithSelector(EnvelopeLib.DailyNavLossBudgetTooHigh.selector, 1001, 1000));
+        registry.registerStrategy(e);
+    }
+
+    function test_TightenAndQueueValidateDailyBudget() public {
+        vm.prank(curator);
+        uint256 id = registry.registerStrategy(_env());
+
+        Envelope memory bad = _env();
+        bad.maxDailyNavLossBps = 0;
+        vm.prank(curator);
+        vm.expectRevert(EnvelopeLib.ZeroDailyNavLossBudget.selector);
+        registry.tightenEnvelope(id, bad);
+
+        bad = _env();
+        bad.maxDailyNavLossBps = 1001;
+        vm.prank(curator);
+        vm.expectRevert(abi.encodeWithSelector(EnvelopeLib.DailyNavLossBudgetTooHigh.selector, 1001, 1000));
+        registry.queueLoosenEnvelope(id, bad);
+
+        Envelope memory tighter = _env();
+        tighter.maxNavLossBps = -100;
+        tighter.maxDailyNavLossBps = 200;
+        vm.prank(curator);
+        registry.tightenEnvelope(id, tighter);
+        assertEq(registry.getEnvelope(id).maxDailyNavLossBps, 200);
+    }
+
     function test_TightenInstant() public {
         vm.prank(curator);
         uint256 id = registry.registerStrategy(_env());
@@ -56,7 +89,8 @@ contract RegistryTest is Test {
             maxTwapDistanceTicks: 1000,
             minRebalanceInterval: 60,
             maxPriceImpactBps: 50,
-            maxNavLossBps: -500
+            maxNavLossBps: -500,
+            maxDailyNavLossBps: 1000
         });
         vm.prank(curator);
         registry.tightenEnvelope(id, tighter);
@@ -72,7 +106,8 @@ contract RegistryTest is Test {
             maxTwapDistanceTicks: 1000,
             minRebalanceInterval: 60,
             maxPriceImpactBps: 50,
-            maxNavLossBps: -500
+            maxNavLossBps: -500,
+            maxDailyNavLossBps: 1000
         });
         vm.prank(curator);
         registry.queueLoosenEnvelope(id, looser);

@@ -28,7 +28,8 @@ contract WorstCaseBoundTest is RudderIntegrationBase {
             maxTwapDistanceTicks: 6000,
             minRebalanceInterval: uint32(INTERVAL),
             maxPriceImpactBps: 10_000,
-            maxNavLossBps: -500
+            maxNavLossBps: -500,
+            maxDailyNavLossBps: 1000
         });
         RudderVault v = _createVault(env);
         _seed(v, alice, -600, 600, DEPOSIT);

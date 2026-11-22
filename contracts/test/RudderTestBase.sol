@@ -66,7 +66,8 @@ abstract contract RudderTestBase is Test {
             maxTwapDistanceTicks: 1000,
             minRebalanceInterval: 60,
             maxPriceImpactBps: 50,
-            maxNavLossBps: -500
+            maxNavLossBps: -500,
+            maxDailyNavLossBps: 1000
         });
     }
 

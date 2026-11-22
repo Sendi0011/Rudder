@@ -52,7 +52,8 @@ contract EnvelopeLibTest is Test {
             maxTwapDistanceTicks: 2000,
             minRebalanceInterval: 60,
             maxPriceImpactBps: 50,
-            maxNavLossBps: -500
+            maxNavLossBps: -500,
+            maxDailyNavLossBps: 1000
         });
     }
 
@@ -97,6 +98,45 @@ contract EnvelopeLibTest is Test {
         e.maxNavLossBps = -501;
         vm.expectRevert(abi.encodeWithSelector(EnvelopeLib.NavLossFloorTooLow.selector, -501, -500));
         w.validate(e);
+    }
+
+    function test_ValidateRejectsInvalidDailyBudget() public {
+        Envelope memory e = _base();
+        e.maxDailyNavLossBps = 0;
+        vm.expectRevert(EnvelopeLib.ZeroDailyNavLossBudget.selector);
+        w.validate(e);
+
+        e = _base();
+        e.maxDailyNavLossBps = 1001;
+        vm.expectRevert(abi.encodeWithSelector(EnvelopeLib.DailyNavLossBudgetTooHigh.selector, 1001, 1000));
+        w.validate(e);
+
+        e = _base();
+        e.maxNavLossBps = -100;
+        e.maxDailyNavLossBps = 199;
+        vm.expectRevert(abi.encodeWithSelector(EnvelopeLib.NavLossFloorExceedsBudget.selector, -100, 199));
+        w.validate(e);
+
+        e.maxDailyNavLossBps = 200;
+        w.validate(e);
+    }
+
+    function test_IsTighter_TreatsSmallerDailyBudgetAsTighter() public view {
+        Envelope memory cur = _base();
+        Envelope memory next = _base();
+        next.maxNavLossBps = -100;
+        next.maxDailyNavLossBps = 200;
+        assertTrue(w.isTighter(cur, next));
+    }
+
+    function test_IsTighter_RejectsLooserDailyBudget() public view {
+        Envelope memory cur = _base();
+        cur.maxNavLossBps = -100;
+        cur.maxDailyNavLossBps = 200;
+        Envelope memory next = _base();
+        next.maxNavLossBps = -100;
+        next.maxDailyNavLossBps = 500;
+        assertFalse(w.isTighter(cur, next));
     }
 
     function test_IsTighter_StrictlyTighter() public view {
