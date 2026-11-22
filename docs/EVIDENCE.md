@@ -50,8 +50,8 @@ tier keeps a residual floor above zero; the two faster tiers can reach the full 
 under repeated maximum-loss rebalances.
 
 The [`placebo_curators.json`](../evidence/placebo_curators.json) sample uses fixed seeds, exact-input
-swaps and shared local pools. The evidence run sets `K=30` for 30 placebos per cell, giving 180 runs
-across six scenarios; the default suite uses `K=4`. Every vault is checkpointed with
+swaps and shared local pools. `K` defaults to 30 and can be lowered with `K=n`; the published sample
+uses 30 placebos per cell, giving 180 runs across six scenarios. Every vault is checkpointed with
 `pokeAlpha()` after each price step, so a static or non-rebalancing curator still accrues alpha over
 the same intervals. The static mean stays at zero because that position matches its hold basket.
 
