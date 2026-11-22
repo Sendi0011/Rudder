@@ -8,7 +8,7 @@ tests with an explicit write switch. A normal `forge test` run does not write th
 ```sh
 WRITE_EVIDENCE=1 FOUNDRY_PROFILE=ci forge test --match-contract EvidenceTest
 WRITE_EVIDENCE=1 FOUNDRY_PROFILE=ci forge test --match-contract WorstCaseBoundTest
-env FOUNDRY_OPTIMIZER=false FOUNDRY_VIA_IR=true WRITE_EVIDENCE=1 forge test --match-contract PlaceboCuratorsTest --block-gas-limit 20000000000 -vv
+env K=30 FOUNDRY_OPTIMIZER=false FOUNDRY_VIA_IR=true WRITE_EVIDENCE=1 forge test --match-contract PlaceboCuratorsTest --block-gas-limit 20000000000 -vv
 WRITE_EVIDENCE=1 FOUNDRY_PROFILE=ci forge test --match-contract VaultInvariantsTest
 ```
 
@@ -50,8 +50,8 @@ tier keeps a residual floor above zero; the two faster tiers can reach the full 
 under repeated maximum-loss rebalances.
 
 The [`placebo_curators.json`](../evidence/placebo_curators.json) sample uses fixed seeds, exact-input
-swaps and shared local pools. `K` defaults to 30 placebos per cell and can be overridden in the
-environment, giving 180 placebo runs across six scenarios. Every vault is checkpointed with
+swaps and shared local pools. The evidence run sets `K=30` for 30 placebos per cell, giving 180 runs
+across six scenarios; the default suite uses `K=4`. Every vault is checkpointed with
 `pokeAlpha()` after each price step, so a static or non-rebalancing curator still accrues alpha over
 the same intervals. The static mean stays at zero because that position matches its hold basket.
 

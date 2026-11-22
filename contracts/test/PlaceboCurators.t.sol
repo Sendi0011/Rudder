@@ -33,7 +33,7 @@ contract PlaceboCuratorsTest is RudderIntegrationBase {
     uint256 internal maxDrawdownBps;
 
     function test_PlaceboCuratorDistribution() public {
-        uint256 k = vm.envOr("K", uint256(30));
+        uint256 k = vm.envOr("K", uint256(4));
         require(k > 0 && k <= 30, "K must be between 1 and 30");
 
         Envelope memory conservative = Envelope({
