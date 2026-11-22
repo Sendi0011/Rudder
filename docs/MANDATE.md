@@ -16,7 +16,9 @@ scope is narrow and local to this repository.
 ## Rebalance loss bound
 
 Let `L` be the positive magnitude of the NAV-loss floor stored as `maxNavLossBps` (a `-500` floor
-means `L = 500`). A single accepted rebalance can compound NAV-per-share by at most `L/10000`, so the
+means `L = 500`). `EnvelopeLib.validate` rejects floors deeper than `-PROTOCOL_MAX_NAV_LOSS_BPS`
+with `PROTOCOL_MAX_NAV_LOSS_BPS = 500`, so `L <= 500`. A single accepted rebalance can compound
+NAV-per-share by at most `L/10000`, so the
 surviving fraction after `n` rebalances is at least `(1 - L/10000)^n`. With minimum interval `I`,
 at most `floor(T/I)` interval-spaced rebalances fit in a horizon `T` after the first range-set.
 The first range-set skips the interval check, so a horizon that starts at bootstrap admits one extra
@@ -60,8 +62,8 @@ reported together as tracking measurements, with the local tolerance stated in
 
 The first deposit and first range-set bootstrap the oracle; after that, deposits and rebalances
 require a ready oracle while withdrawals remain independent of it. Pause blocks deposits and
-rebalances, never withdrawals. Envelope authors choose the bounds; a loose bound is a policy choice,
-not a protocol guarantee.
+rebalances, never withdrawals. Envelope authors choose bounds within the protocol NAV-loss floor;
+a looser floor than `-500` bps is rejected at registration.
 
 Claims and their local artifacts are listed in [`CLAIMS.md`](CLAIMS.md). Reproduction commands are in
 [`EVIDENCE.md`](EVIDENCE.md).

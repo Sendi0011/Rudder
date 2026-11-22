@@ -15,6 +15,9 @@ badness never blocks withdrawals. <!-- claim:RUD-001 -->
   lenient: any return above a passive hold counts, so it overstates active skill. <!-- claim:RUD-004 -->
 - **Transparent ranking.** Strategies are ranked by on-chain per-interval alpha versus a hold
   benchmark, expressed as a dimensionless return. AUM and volume never feed the ranking. <!-- claim:RUD-005 -->
+- **Permissionless alpha checkpoints.** Anyone can call `pokeAlpha()` to accrue and rebase when the
+  oracle is ready. Without a token flow it cannot change shares or payouts, and a stale or reverting
+  oracle leaves state unchanged. <!-- claim:RUD-031 -->
 
 ## Layout
 
@@ -65,11 +68,15 @@ Local measurements from `FOUNDRY_PROFILE=ci forge test --match-contract Evidence
 - Churn ranking: across **3** rebalances the ranking gap was **200** bps against **249** bps summed cost
   ([`evidence/churner_alpha.json`](evidence/churner_alpha.json)). <!-- claim:RUD-013 -->
 - Rebalance bound: a **500** bps per-rebalance floor over **30** seconds at a **10**-second interval allowed
-  **1,856** bps across **4** rebalances; measured loss was **73** bps across **3** charged rebalances
+  **1,856** bps across **4** rebalances; measured loss was **73** bps across **3** charged rebalances.
+  For an **86,400**-second horizon, tiers with **200** bps floors at **3,600** seconds, **500** bps at
+  **1,800** seconds and **500** bps at **600** seconds allow **3,975**, **9,197** and **10,000** bps
+  across **25**, **49** and **145** rebalances
   ([`evidence/worst_case_loss.json`](evidence/worst_case_loss.json)). <!-- claim:RUD-029 -->
-- Curator sample: **4** random curators over **3** regimes and **2** envelopes saw a **-5** bps reactive
-  mean against a **-7** bps placebo mean with **34** bps dispersion; worst loss was **77** bps against
-  a **9,981** bps bound and **183** bps drawdown
+- Curator sample: **30** random curators per cell (**180** placebo samples) over **3** regimes and **2**
+  envelopes saw a **-16** bps reactive mean, **0** bps static mean and **-12** bps placebo mean, with
+  **35** bps dispersion, a z-score scaled by **100** of **-11**, worst loss **90** bps against a
+  **3,701** bps bound and **284** bps drawdown
   ([`evidence/placebo_curators.json`](evidence/placebo_curators.json)). <!-- claim:RUD-030 -->
 
 Fork test against a live network (skipped when the RPC is unset): <!-- claim:RUD-014 -->
@@ -206,6 +213,7 @@ performed by these local commands. <!-- claim:RUD-019 --> Development friction a
 - [`docs/FEEDBACK.md`](docs/FEEDBACK.md) — Uniswap v4 developer friction encountered while building
 - [`docs/adr/ADR-001-architecture.md`](docs/adr/ADR-001-architecture.md) — architecture decisions
 - [`docs/adr/ADR-002-oracle-and-rebalance-swap.md`](docs/adr/ADR-002-oracle-and-rebalance-swap.md) — oracle and rebalance decisions
+- [`docs/adr/ADR-003-protocol-nav-loss-floor.md`](docs/adr/ADR-003-protocol-nav-loss-floor.md) — protocol NAV-loss floor
 
 ## Partner integrations
 

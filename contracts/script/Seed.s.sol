@@ -105,7 +105,7 @@ contract Seed is Script {
             maxTwapDistanceTicks: 4800,
             minRebalanceInterval: 600,
             maxPriceImpactBps: 1000,
-            maxNavLossBps: -1000
+            maxNavLossBps: -500
         });
 
         int24[3] memory lowers = [int24(-600), int24(-1200), int24(-2400)];

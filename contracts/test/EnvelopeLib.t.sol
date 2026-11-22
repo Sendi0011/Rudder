@@ -92,6 +92,13 @@ contract EnvelopeLibTest is Test {
         w.validate(e);
     }
 
+    function test_Validate_RejectsNavLossFloorBelowProtocolCap() public {
+        Envelope memory e = _base();
+        e.maxNavLossBps = -501;
+        vm.expectRevert(abi.encodeWithSelector(EnvelopeLib.NavLossFloorTooLow.selector, -501, -500));
+        w.validate(e);
+    }
+
     function test_IsTighter_StrictlyTighter() public view {
         Envelope memory cur = _base();
         Envelope memory next = _base();
@@ -129,7 +136,7 @@ contract EnvelopeLibTest is Test {
         assertFalse(w.isTighter(cur, next), "higher impact bound is looser");
 
         next = _base();
-        next.maxNavLossBps = -1000;
+        next.maxNavLossBps = -501;
         assertFalse(w.isTighter(cur, next), "deeper loss floor is looser");
     }
 

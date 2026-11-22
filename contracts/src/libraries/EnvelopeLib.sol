@@ -18,6 +18,8 @@ struct Envelope {
 /// @notice Validation and strictness comparison for envelopes. "Stricter" means each field is at
 ///         least as restrictive: caps shrink, floors rise, minimums grow.
 library EnvelopeLib {
+    int24 internal constant PROTOCOL_MAX_NAV_LOSS_BPS = 500;
+
     error InvalidParams();
     error NotTighter();
     error InvalidRangeWidth(int24 width, int24 maxWidth);
@@ -25,6 +27,7 @@ library EnvelopeLib {
     error IntervalTooShort(uint256 lastTs, uint256 nowTs, uint256 minInterval);
     error PriceImpactTooHigh(uint32 impactBps, uint32 maxPriceImpactBps);
     error NavLossTooLarge(int24 lossBps, int24 maxNavLossBps);
+    error NavLossFloorTooLow(int24 floor, int24 minFloor);
 
     /// @notice Reject degenerate envelopes: caps must be positive, intervals nonzero, and the
     ///         impact/loss bounds within their natural ranges.
@@ -34,8 +37,10 @@ library EnvelopeLib {
         if (e.maxTwapDistanceTicks < 0) revert InvalidParams();
         if (e.minRebalanceInterval == 0) revert InvalidParams();
         if (e.maxPriceImpactBps > 10_000) revert InvalidParams();
-        // A NAV-loss floor above zero would be meaningless (a gain bound masquerading as a floor).
         if (e.maxNavLossBps > 0) revert InvalidParams();
+        if (e.maxNavLossBps < -PROTOCOL_MAX_NAV_LOSS_BPS) {
+            revert NavLossFloorTooLow(e.maxNavLossBps, -PROTOCOL_MAX_NAV_LOSS_BPS);
+        }
     }
 
     /// @notice True if every field of `next` is at least as strict as `current`. Instant tightening

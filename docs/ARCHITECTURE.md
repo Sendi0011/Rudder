@@ -53,5 +53,5 @@ curator-operated vaults that steer a single LP range inside an on-chain mandate.
 - Pause suppresses deposits and rebalances and never affects withdrawals.
 
 See `THREAT_MODEL.md` for the threat/ mitigation table, `KNOWN_LIMITATIONS.md` for the known
-boundaries, and `adr/ADR-001-architecture.md` and `adr/ADR-002-oracle-and-rebalance-swap.md` for the
-decisions behind this layout.
+boundaries, and `adr/ADR-001-architecture.md`, `adr/ADR-002-oracle-and-rebalance-swap.md` and
+`adr/ADR-003-protocol-nav-loss-floor.md` for the decisions behind this layout.

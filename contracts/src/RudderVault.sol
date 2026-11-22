@@ -138,6 +138,7 @@ contract RudderVault is Initializable, ERC20, ReentrancyGuard, IUnlockCallback {
     );
     event Rebalance(uint256 indexed strategyId, int24 tickLower, int24 tickUpper, uint128 liquidity);
     event FeesClaimed(address indexed recipient, uint256 amount0, uint256 amount1);
+    event AlphaPoked(address indexed caller, int256 cumulativeAlpha);
 
     /// @dev Clone metadata cannot be written by the implementation constructor, so name/symbol are fixed.
     constructor() ERC20("Rudder Vault Share", "RVS") {
@@ -639,7 +640,7 @@ contract RudderVault is Initializable, ERC20, ReentrancyGuard, IUnlockCallback {
     ///      a baseline exists (first action) or while the oracle is not ready.
     function _accrueAlphaInterval() internal {
         if (baseNavPerShare == 0) return;
-        if (!IRudderHook(hook).isOracleReady(poolKey)) return;
+        if (!_oracleReady()) return;
         uint256 supply = totalSupply();
         if (supply == 0) return;
         uint160 sqrtP = _twapSqrtPrice();
@@ -661,7 +662,7 @@ contract RudderVault is Initializable, ERC20, ReentrancyGuard, IUnlockCallback {
     ///      start the next interval rather than counting as performance. While the oracle is not ready
     ///      the baseline is left untouched, so the next interval spans the gap.
     function _rebaseAlphaBaseline() internal {
-        if (!IRudderHook(hook).isOracleReady(poolKey)) return;
+        if (!_oracleReady()) return;
         uint256 supply = totalSupply();
         if (supply == 0) {
             baseNavPerShare = 0;
@@ -682,7 +683,7 @@ contract RudderVault is Initializable, ERC20, ReentrancyGuard, IUnlockCallback {
         internal
         returns (uint256 fee0, uint256 fee1)
     {
-        if (!IRudderHook(hook).isOracleReady(poolKey)) return (0, 0);
+        if (!_oracleReady()) return (0, 0);
         uint160 sqrtP = _twapSqrtPrice();
         if (_consultFailed()) return (0, 0);
         uint256 valueOut = LiquidityLib.valueInToken0(total0, total1, sqrtP);
@@ -804,5 +805,21 @@ contract RudderVault is Initializable, ERC20, ReentrancyGuard, IUnlockCallback {
             hbTo.amount1 += moved1;
         }
         super._update(from, to, value);
+    }
+
+    function pokeAlpha() external nonReentrant {
+        if (!_oracleReady()) return;
+        _clearPriceCache();
+        _accrueAlphaInterval();
+        _rebaseAlphaBaseline();
+        emit AlphaPoked(msg.sender, cumulativeAlpha);
+    }
+
+    function _oracleReady() internal view returns (bool) {
+        try IRudderHook(hook).isOracleReady(poolKey) returns (bool ready) {
+            return ready;
+        } catch {
+            return false;
+        }
     }
 }

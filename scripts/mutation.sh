@@ -88,6 +88,7 @@ MUTATIONS=(
     protocol_price_impact_cap
     registry_failure_exit_independence
     oracle_one_sample_per_timestamp
+    poke_alpha_removes_accrue
 )
 
 TESTS=(
@@ -119,6 +120,7 @@ TESTS=(
     test_DepositRejectedAboveProtocolCap
     test_WithdrawWithRegistryRevertPaysProRata
     test_OneSamplePerBlock
+    test_PokeAlphaAccruesWithoutFlow
 )
 
 find_test() {
@@ -203,7 +205,7 @@ patches = {
     ),
     "fee_when_oracle_not_ready": (
         "contracts/src/RudderVault.sol",
-        """        if (!IRudderHook(hook).isOracleReady(poolKey)) return (0, 0);""",
+        """        if (!_oracleReady()) return (0, 0);""",
         """        {}""",
     ),
     "hold_basket_on_transfer": (
@@ -291,6 +293,16 @@ patches = {
         "contracts/src/RudderHook.sol",
         """        if (o.count > 0 && _newest(o).timestamp == uint32(block.timestamp)) return;""",
         """        {}""",
+    ),
+    "poke_alpha_removes_accrue": (
+        "contracts/src/RudderVault.sol",
+        """        _clearPriceCache();
+        _accrueAlphaInterval();
+        _rebaseAlphaBaseline();
+        emit AlphaPoked(msg.sender, cumulativeAlpha);""",
+        """        _clearPriceCache();
+        _rebaseAlphaBaseline();
+        emit AlphaPoked(msg.sender, cumulativeAlpha);""",
     ),
 }
 
