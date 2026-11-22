@@ -6,6 +6,7 @@
     "HorizonSeconds": 86400,
     "BoundBps": 200,
     "ObservedBps": 198,
+    "MaxObservedCostBps": 31,
     "Rebalances": 16
   },
   "balanced": {
@@ -15,6 +16,7 @@
     "HorizonSeconds": 86400,
     "BoundBps": 500,
     "ObservedBps": 495,
+    "MaxObservedCostBps": 31,
     "Rebalances": 33
   },
   "aggressive": {
@@ -24,6 +26,7 @@
     "HorizonSeconds": 86400,
     "BoundBps": 1000,
     "ObservedBps": 983,
+    "MaxObservedCostBps": 32,
     "Rebalances": 89
   }
 }

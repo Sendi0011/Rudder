@@ -15,6 +15,7 @@ contract WorstCaseBoundTest is RudderIntegrationBase {
         uint256 horizonSeconds;
         uint256 boundBps;
         uint256 observedBps;
+        uint256 maxObservedCostBps;
         uint256 rebalances;
     }
 
@@ -89,6 +90,7 @@ contract WorstCaseBoundTest is RudderIntegrationBase {
         uint256 bootstrap = ts;
         uint256 attempts = HORIZON / interval + 1;
         uint256 observedMicroBps;
+        uint256 maxCostMicroBps;
         for (uint256 i = 0; i < attempts; i++) {
             bool zeroForOne = i % 2 == 0;
             _swap(zeroForOne, int256(SWAP_AMOUNT));
@@ -99,6 +101,7 @@ contract WorstCaseBoundTest is RudderIntegrationBase {
             uint256 cost = _tryRebalance(v, lo, hi);
             if (cost > 0) {
                 observedMicroBps += cost;
+                if (cost > maxCostMicroBps) maxCostMicroBps = cost;
                 result.rebalances++;
             }
         }
@@ -109,8 +112,10 @@ contract WorstCaseBoundTest is RudderIntegrationBase {
         result.horizonSeconds = HORIZON;
         result.boundBps = budgetBps;
         result.observedBps = observedMicroBps == 0 ? 0 : (observedMicroBps + 999_999) / 1_000_000;
+        result.maxObservedCostBps = maxCostMicroBps == 0 ? 0 : (maxCostMicroBps + 999_999) / 1_000_000;
         assertGt(observedMicroBps, 0);
         assertLe(result.observedBps, result.boundBps);
+        assertLe(result.maxObservedCostBps, result.navLossFloorBps);
     }
 
     function _tryRebalance(RudderVault v, int24 lo, int24 hi) internal returns (uint256 cost) {
@@ -152,6 +157,8 @@ contract WorstCaseBoundTest is RudderIntegrationBase {
         string memory tail = string.concat(
             ",\"ObservedBps\":",
             vm.toString(result.observedBps),
+            ",\"MaxObservedCostBps\":",
+            vm.toString(result.maxObservedCostBps),
             ",\"Rebalances\":",
             vm.toString(result.rebalances),
             "}"
