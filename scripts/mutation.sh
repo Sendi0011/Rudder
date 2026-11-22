@@ -205,7 +205,7 @@ patches = {
     ),
     "fee_when_oracle_not_ready": (
         "contracts/src/RudderVault.sol",
-        """        if (!IRudderHook(hook).isOracleReady(poolKey)) return (0, 0);""",
+        """        if (!_oracleReady()) return (0, 0);""",
         """        {}""",
     ),
     "hold_basket_on_transfer": (
