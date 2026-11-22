@@ -31,9 +31,10 @@ each item is either an accepted design trade-off or work that is not yet done.
 - **The tiers trade speed for protection.** Tighter envelopes lengthen the interval and shorten the
   allowed range, which reduces the room to act and the frequency of action at the same time. Looser
   envelopes buy responsiveness by allowing wider ranges and larger per-step loss.
-- **A daily-budget variant is future work.** The registry caps each action, but it does not cap the
-  sum of allowed losses over a rolling day. The compounding limits in
-  [`MANDATE.md`](MANDATE.md) describe the ceiling; they do not allocate a spendable daily allowance.
+- **The daily budget prices rebalance loss only.** The bucket charges TWAP-measured NAV loss from a
+  rebalance; it does not cap market-price moves, fee opportunity cost or rounding in favor of LPs.
+  The seeded budgets and observed charged loss are in
+  [`evidence/worst_case_loss.json`](../evidence/worst_case_loss.json).
 
 ## Resolved
 
@@ -56,6 +57,10 @@ each item is either an accepted design trade-off or work that is not yet done.
   guard by widening its own envelope.
 - **A registry failure cannot block exits.** The vault reports alpha best-effort, so a revert in the
   registry never turns a withdrawal into a revert.
+- **Rebalance loss has a spendable daily allowance.** A leaky bucket in `RudderVault` caps the
+  cumulative charge and refills continuously; the source mutants in
+  [`evidence/mutation.md`](../evidence/mutation.md) cover the capacity, refill, rounding and
+  validation checks.
 
 ## Not yet done
 

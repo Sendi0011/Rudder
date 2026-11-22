@@ -6,7 +6,7 @@ scope is narrow and local to this repository.
 ## In scope
 
 - A per-vault envelope stored in `StrategyRegistry`: range width, centre shift, rebalance interval,
-  TWAP distance, price impact and NAV loss.
+  TWAP distance, price impact, NAV-loss floor and daily NAV-loss budget.
 - Instant envelope tightening and delayed loosening through the strategy curator.
 - Deposits and rebalances gated by a cumulative-tick TWAP with one sample per block timestamp.
 - Exits that do not consult oracle state, a registry or an unbounded loop.
@@ -31,6 +31,21 @@ rebalance:
 A horizon that starts after bootstrap with a known last rebalance timestamp replaces the `+ 1` with
 zero when no immediate rebalance is allowed. The bound compounds the accounting loss measured by
 `RudderVault._navLossBps`; it is not a market-price drawdown bound.
+
+## Daily loss budget
+
+The daily budget is the spendable allowance behind those per-action floors. `EnvelopeLib.validate`
+rejects a zero budget, a budget above the protocol ceiling and a floor magnitude above half the
+budget. The seeded floors, budgets, intervals and bounds are recorded in
+[`evidence/worst_case_loss.json`](../evidence/worst_case_loss.json).
+
+`RudderVault` charges each rebalance to a per-vault leaky bucket after the NAV-loss floor passes. The
+bucket starts with half the budget, refills that amount over the horizon recorded in
+[`evidence/worst_case_loss.json`](../evidence/worst_case_loss.json), and rejects a rebalance whose
+rounded-up charge would exceed capacity. A tighter budget lowers capacity immediately without
+clamping the stored bucket; a looser budget must clear the existing timelock. Deposits, withdrawals
+and alpha poking never consult the bucket. The parameter choice and the rejected fixed-window reset
+are recorded in [`ADR-004`](adr/ADR-004-daily-loss-budget.md).
 
 ## Envelope authority
 

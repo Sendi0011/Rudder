@@ -28,13 +28,15 @@ curator-operated vaults that steer a single LP range inside an on-chain mandate.
 ```
 
 - **`StrategyRegistry`** is the source of truth for each strategy's `Envelope` and curator. Envelopes
-  tighten instantly and loosen behind a 24h timelock. Ranking is per-interval alpha versus a hold
-  benchmark, anchored at the lookback cutoff and read through bounded leaderboard pages.
+  tighten instantly and loosen behind a 24h timelock, and queued loosening is validated when queued.
+  Ranking is per-interval alpha versus a hold benchmark, anchored at the lookback cutoff and read
+  through bounded leaderboard pages.
 - **`VaultFactory`** clones vaults as minimal proxies, pins the single trusted hook, and requires the
   pool to already be initialized and to use that hook.
 - **`RudderVault`** holds LP assets and one v4 position plus idle balances. It opens/closes the
   position through `PoolManager.unlock` directly (no PositionManager NFT). Its `rebalance` validates
-  the envelope on-chain; withdrawals are always pro-rata and never revert on a bad oracle.
+  the envelope on-chain and charges a leaky-bucket daily loss budget; withdrawals are always pro-rata
+  and never revert on a bad oracle or a depleted bucket.
 - **`RudderHook`** gates which addresses may add liquidity (only factory vaults), independently
   enforces each vault's live envelope on every add (alignment, width, TWAP distance, interval), and
   maintains a manipulation-resistant TWAP from pre-swap prices. Removals are never gated.
@@ -47,11 +49,14 @@ curator-operated vaults that steer a single LP range inside an on-chain mandate.
 - The performance fee never exceeds `PROTOCOL_MAX_FEE_BPS` and is zero on a loss or a stale oracle.
 - The envelope width is never exceeded by the live position.
 - `rebalance` reverts if any envelope bound (width, centre shift, interval, price impact, NAV loss,
-  distance from the TWAP tick) is violated.
+  daily NAV-loss budget, distance from the TWAP tick) is violated.
+- The loss bucket never exceeds its capacity and the sum of charged micro-bps in any rolling day stays
+  inside the daily budget; deposit, withdrawal and alpha-poke paths do not read the bucket.
 - The hook's add gate never seats a vault's liquidity outside its envelope, even if the vault skips
   its own checks; top-up adds into the live range are exempt and removals are never gated.
 - Pause suppresses deposits and rebalances and never affects withdrawals.
 
 See `THREAT_MODEL.md` for the threat/ mitigation table, `KNOWN_LIMITATIONS.md` for the known
-boundaries, and `adr/ADR-001-architecture.md`, `adr/ADR-002-oracle-and-rebalance-swap.md` and
-`adr/ADR-003-protocol-nav-loss-floor.md` for the decisions behind this layout.
+boundaries, and `adr/ADR-001-architecture.md`, `adr/ADR-002-oracle-and-rebalance-swap.md`,
+`adr/ADR-003-protocol-nav-loss-floor.md` and
+`adr/ADR-004-daily-loss-budget.md` for the decisions behind this layout.
