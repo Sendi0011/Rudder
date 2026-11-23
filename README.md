@@ -100,19 +100,23 @@ The fork lifecycle test runs only when an RPC is configured:
 forge test --match-contract ForkLifecycleTest -vvv
 ```
 
-Dry-run each script against the configured RPC without broadcasting:
+Every `forge script` call passes the signer explicitly. If `DEPLOYER_ACCOUNT` is set, replace
+`--private-key "$PRIVATE_KEY"` with `--account "$DEPLOYER_ACCOUNT"` in these commands.
+
+Dry-run each script against the configured RPC without broadcasting. `Deploy.s.sol` executes its
+body during a dry run, so use `WRITE_DEPLOYMENTS=0` to avoid overwriting `contracts/deployments.json`:
 
 ```sh
-forge script contracts/script/Deploy.s.sol:Deploy --rpc-url "$UNICHAIN_SEPOLIA_RPC_URL" -vvv
-forge script contracts/script/Seed.s.sol:Seed --rpc-url "$UNICHAIN_SEPOLIA_RPC_URL" -vvv
-forge script contracts/script/Activity.s.sol:Activity --rpc-url "$UNICHAIN_SEPOLIA_RPC_URL" -vvv
+WRITE_DEPLOYMENTS=0 forge script contracts/script/Deploy.s.sol:Deploy --rpc-url "$UNICHAIN_SEPOLIA_RPC_URL" --private-key "$PRIVATE_KEY" --sender "$DEPLOYER_ADDRESS" -vvv
+forge script contracts/script/Seed.s.sol:Seed --rpc-url "$UNICHAIN_SEPOLIA_RPC_URL" --private-key "$PRIVATE_KEY" --sender "$DEPLOYER_ADDRESS" -vvv
+forge script contracts/script/Activity.s.sol:Activity --rpc-url "$UNICHAIN_SEPOLIA_RPC_URL" --private-key "$PRIVATE_KEY" --sender "$DEPLOYER_ADDRESS" -vvv
 ```
 
-Broadcast only after reviewing the dry-run output:
+Broadcast only after reviewing the dry-run output, with `--slow` so transactions stay ordered:
 
 ```sh
-forge script contracts/script/Deploy.s.sol:Deploy --rpc-url "$UNICHAIN_SEPOLIA_RPC_URL" --broadcast -vvv
-forge script contracts/script/Seed.s.sol:Seed --rpc-url "$UNICHAIN_SEPOLIA_RPC_URL" --broadcast -vvv
+forge script contracts/script/Deploy.s.sol:Deploy --rpc-url "$UNICHAIN_SEPOLIA_RPC_URL" --private-key "$PRIVATE_KEY" --sender "$DEPLOYER_ADDRESS" --broadcast --slow -vvv
+forge script contracts/script/Seed.s.sol:Seed --rpc-url "$UNICHAIN_SEPOLIA_RPC_URL" --private-key "$PRIVATE_KEY" --sender "$DEPLOYER_ADDRESS" --broadcast --slow -vvv
 ```
 
 `Deploy.s.sol` writes `contracts/deployments.json`; `Seed.s.sol` writes `contracts/seed.json`. Run

@@ -9,8 +9,15 @@ proxy and calls that proxy directly. The hook address therefore matches the mine
 relying on Foundry's `new C{salt: ...}` sender. A local test etches the canonical proxy runtime and
 rejects a selector-encoded call; see `contracts/test/DeployScriptTest.t.sol`.
 
-To record a deployment, run the script with `WRITE_DEPLOYMENTS=1`, copy the emitted addresses into
-the README table and run:
+Every `forge script` call passes `--private-key "$PRIVATE_KEY" --sender "$DEPLOYER_ADDRESS"`. If
+`DEPLOYER_ACCOUNT` is set, use `--account "$DEPLOYER_ACCOUNT" --sender "$DEPLOYER_ADDRESS"` instead.
+Broadcasts also pass `--slow` so transactions stay ordered.
+
+A dry run executes the script body, so `Deploy.s.sol` would overwrite `contracts/deployments.json`
+with `WRITE_DEPLOYMENTS=1`. Run dry runs with `WRITE_DEPLOYMENTS=0`.
+
+To record a deployment, broadcast with `WRITE_DEPLOYMENTS=1`, copy the emitted addresses into the
+README table, then run:
 
 ```sh
 bash scripts/verify-deployment.sh
