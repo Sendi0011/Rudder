@@ -86,6 +86,7 @@ contract ForkLifecycleTest is Test {
             maxNavLossBps: -500,
             maxDailyNavLossBps: 1000
         });
+        vm.prank(curator);
         strategyId = registry.registerStrategy(env);
 
         vm.deal(curator, 1 ether);
