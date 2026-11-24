@@ -39,6 +39,7 @@ contract ForkLifecycleTest is Test {
     int24 internal constant NEXT_UPPER = 1200;
     uint256 internal constant MAX_TICK_DRIFT = 60;
     uint256 internal constant SWAP_AMOUNT = 1e15;
+    uint256 internal constant TRADER_FUND = SWAP_AMOUNT * 4;
 
     IPoolManager internal manager;
     TestERC20 internal token0;
@@ -54,6 +55,7 @@ contract ForkLifecycleTest is Test {
 
     address internal curator = address(0xC0);
     address internal lp = address(0x11);
+    address internal trader = address(0x22);
 
     function setUp() public {
         string memory rpc = vm.envOr("UNICHAIN_SEPOLIA_RPC_URL", string(""));
@@ -66,6 +68,8 @@ contract ForkLifecycleTest is Test {
         swapper = PoolSwapTest(POOL_SWAP_TEST);
 
         (token0, token1) = _deploySortedTokens();
+        token0.mint(trader, TRADER_FUND);
+        token1.mint(trader, TRADER_FUND);
 
         registry = new StrategyRegistry();
         RudderVault implementation = new RudderVault();
@@ -164,20 +168,21 @@ contract ForkLifecycleTest is Test {
         vm.startPrank(who);
         IERC20(address(token0)).approve(address(vault), type(uint256).max);
         IERC20(address(token1)).approve(address(vault), type(uint256).max);
-        IERC20(address(token0)).approve(address(swapper), type(uint256).max);
-        IERC20(address(token1)).approve(address(swapper), type(uint256).max);
         vm.stopPrank();
     }
 
     function _externalSwap(bool zeroForOne, uint256 amount) internal {
         uint160 limit = zeroForOne ? TickMath.getSqrtPriceAtTick(FIRST_LOWER) : TickMath.getSqrtPriceAtTick(FIRST_UPPER);
-        vm.prank(lp);
+        vm.startPrank(trader);
+        IERC20(address(token0)).approve(address(swapper), type(uint256).max);
+        IERC20(address(token1)).approve(address(swapper), type(uint256).max);
         swapper.swap(
             key,
             SwapParams({zeroForOne: zeroForOne, amountSpecified: -int256(amount), sqrtPriceLimitX96: limit}),
             PoolSwapTest.TestSettings({takeClaims: false, settleUsingBurn: false}),
             ""
         );
+        vm.stopPrank();
     }
 
     function _mineHook(uint160 flags, bytes memory constructorArgs) internal view returns (address, bytes32) {
