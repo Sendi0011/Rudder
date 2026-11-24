@@ -271,14 +271,14 @@ Demo video: `<placeholder>`
 
 ## Deployed addresses
 
-Deployed addresses table: (empty)
+Deployed addresses table:
 
 | Contract | Address |
 | --- | --- |
-| RudderHook |  |
-| StrategyRegistry |  |
-| RudderVault implementation |  |
-| VaultFactory |  |
-| PoolManager |  |
-| Token0 |  |
-| Token1 |  |
+| RudderHook | 0x19e5C142eF99698474E51E0CBcDFF768816c8880 |
+| StrategyRegistry | 0x5C0638eaff9F0288a5FCe0589739f90f8E81D2f3 |
+| RudderVault implementation | 0x8A4e537889725c4A90F652657a9911B07D85FCb1 |
+| VaultFactory | 0xef7e8C81a7B5c23D70390B481f30524b9C98cC0b |
+| PoolManager | 0x00B036B58a818B1BC34d502D3fE730Db729e62AC |
+| Token0 | 0x1474d31bf469dEd9cae717CEDCF7F04e0F7aFc3b |
+| Token1 | 0x38cC31de13281F81e4b88aEC290FE28616c5c4e6 |
