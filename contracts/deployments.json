@@ -1,3 +1,8 @@
 {
-  "network": "unichain-sepolia"
+  "chainId": 1301,
+  "poolManager": "0x00B036B58a818B1BC34d502D3fE730Db729e62AC",
+  "rudderHook": "0x19e5C142eF99698474E51E0CBcDFF768816c8880",
+  "strategyRegistry": "0x5C0638eaff9F0288a5FCe0589739f90f8E81D2f3",
+  "vaultFactory": "0xef7e8C81a7B5c23D70390B481f30524b9C98cC0b",
+  "vaultImplementation": "0x8A4e537889725c4A90F652657a9911B07D85FCb1"
 }
