@@ -1,11 +1,33 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+PHASE="full"
+if [[ $# -gt 0 ]]; then
+  case "$1" in
+    --phase)
+      PHASE="${2:-}"
+      shift 2
+      ;;
+    --phase=*)
+      PHASE="${1#--phase=}"
+      shift
+      ;;
+    *)
+      printf 'usage: %s [--phase deploy|full]\n' "$0" >&2
+      exit 2
+      ;;
+  esac
+fi
+if [[ "$PHASE" != "deploy" && "$PHASE" != "full" ]]; then
+  printf 'invalid phase %s: use deploy or full\n' "$PHASE" >&2
+  exit 2
+fi
+
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 ARTIFACT="${DEPLOYMENTS_FILE:-$ROOT/contracts/deployments.json}"
 README="$ROOT/README.md"
 
-python3 - "$ARTIFACT" "$README" "$ROOT" <<'PY'
+python3 - "$ARTIFACT" "$README" "$ROOT" "$PHASE" <<'PY'
 import json
 import os
 import subprocess
@@ -15,8 +37,11 @@ from pathlib import Path
 artifact = Path(sys.argv[1])
 readme = Path(sys.argv[2])
 root = Path(sys.argv[3])
+phase = sys.argv[4]
 results = []
 success_line = None
+if phase == "deploy":
+    success_line = "DEPLOY_OK: artifact, code and bindings"
 
 keys = {
     "RudderHook": "rudderHook",
@@ -158,9 +183,10 @@ emit_if_missing = any(not item[1] for item in results)
 if emit_if_missing:
     emit()
 
-for name, key in keys.items():
-    listed = table.get(name, "")
-    add(f"README address: {name}", same_addr(listed, data[key]), listed or "missing")
+if phase == "full":
+    for name, key in keys.items():
+        listed = table.get(name, "")
+        add(f"README address: {name}", same_addr(listed, data[key]), listed or "missing")
 
 rpc = os.environ.get("UNICHAIN_SEPOLIA_RPC_URL", "")
 if not rpc:
@@ -200,21 +226,22 @@ for label, address, signature, expected in (
     ok, value, err = call(address, signature)
     add(label, ok and same_addr(value, expected), err or value)
 
-seed_path = root / "contracts" / "seed.json"
-if not seed_path.is_file():
-    add("oracle ready after activity", False, f"missing {seed_path.relative_to(root)}")
-else:
-    try:
-        seed = json.loads(seed_path.read_text(encoding="utf-8"))
-        key_tuple = (
-            f"({seed['token0']},{seed['token1']},{seed['fee']},"
-            f"{seed['tickSpacing']},{hook})"
-        )
-        signature = "isOracleReady((address,address,uint24,int24,address)) returns (bool)"
-        ok, value, err = call(hook, signature, key_tuple)
-        add("oracle ready after activity", ok and as_bool(value), err or value or "false")
-    except (KeyError, OSError, ValueError) as exc:
-        add("oracle ready after activity", False, str(exc))
+if phase == "full":
+    seed_path = root / "contracts" / "seed.json"
+    if not seed_path.is_file():
+        add("oracle ready after activity", False, f"missing {seed_path.relative_to(root)}")
+    else:
+        try:
+            seed = json.loads(seed_path.read_text(encoding="utf-8"))
+            key_tuple = (
+                f"({seed['token0']},{seed['token1']},{seed['fee']},"
+                f"{seed['tickSpacing']},{hook})"
+            )
+            signature = "isOracleReady((address,address,uint24,int24,address)) returns (bool)"
+            ok, value, err = call(hook, signature, key_tuple)
+            add("oracle ready after activity", ok and as_bool(value), err or value or "false")
+        except (KeyError, OSError, ValueError) as exc:
+            add("oracle ready after activity", False, str(exc))
 
 emit()
 PY

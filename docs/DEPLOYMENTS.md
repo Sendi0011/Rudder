@@ -16,11 +16,13 @@ Broadcasts also pass `--slow` so transactions stay ordered.
 A dry run executes the script body, so `Deploy.s.sol` would overwrite `contracts/deployments.json`
 with `WRITE_DEPLOYMENTS=1`. Run dry runs with `WRITE_DEPLOYMENTS=0`.
 
-To record a deployment, broadcast with `WRITE_DEPLOYMENTS=1`, copy the emitted addresses into the
-README table, then run:
+Use `--phase deploy` right after broadcasting `Deploy.s.sol`: it checks the artifact, runtime code
+and code hashes, hook owner and contract bindings, without needing README addresses or `seed.json`.
+After Seed and Activity, fill the README table from the artifact and run the full check:
 
 ```sh
-bash scripts/verify-deployment.sh
+bash scripts/verify-deployment.sh --phase deploy
+bash scripts/verify-deployment.sh --phase full
 ```
 
 The check prints a pass/fail table and exits non-zero on any failure. It compares the README with the
