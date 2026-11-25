@@ -8,7 +8,7 @@ on:
 
 jobs:
   frontend:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     env:
       FOUNDRY_PROFILE: ci
     defaults:
