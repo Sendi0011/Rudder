@@ -252,7 +252,17 @@ contract VaultInvariantsTest is RudderIntegrationBase {
 
         bytes4[] memory sels = new bytes4[](1);
         sels[0] = VaultHandler.exercise.selector;
+        targetContract(address(handler));
         targetSelector(FuzzSelector({addr: address(handler), selectors: sels}));
+        excludeContract(address(manager));
+        excludeContract(address(token0));
+        excludeContract(address(token1));
+        excludeContract(address(router));
+        excludeContract(address(registry));
+        excludeContract(address(vaultImpl));
+        excludeContract(address(factory));
+        excludeContract(address(hook));
+        excludeContract(address(vault));
     }
 
     function _writeEvidence(string memory json, string memory path) internal {
