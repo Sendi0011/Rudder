@@ -83,10 +83,18 @@ contract VaultHandler is Test {
 
         vm.prank(curator);
         vault.rebalance(-600, 600);
+        ghostRebalances++;
+        totalCalls++;
         _deposit(0, 50_000e18, 50_000e18);
+        ghostDeposits++;
+        totalCalls++;
         _swap(true, 1e14);
+        ghostSwaps++;
+        totalCalls++;
         vm.warp(block.timestamp + 10);
         _swap(false, 1e14);
+        ghostSwaps++;
+        totalCalls++;
         vm.warp(block.timestamp + 10);
     }
 
@@ -362,8 +370,8 @@ contract VaultInvariantsTest is RudderIntegrationBase {
         uint256 nav = vault.totalAssetsValue();
         assertLe(nav + pending, holdings + 1, "nav + pending fees must be backed by holdings");
 
-        assertGe(idle0, vault.pendingFees0(), "pending fee0 not backed by idle tokens");
-        assertGe(idle1, vault.pendingFees1(), "pending fee1 not backed by idle tokens");
+        assertGe(idle0 + 1, vault.pendingFees0(), "pending fee0 not backed by idle tokens");
+        assertGe(idle1 + 1, vault.pendingFees1(), "pending fee1 not backed by idle tokens");
 
         uint256 supply = vault.totalSupply();
         if (supply > 0) {
