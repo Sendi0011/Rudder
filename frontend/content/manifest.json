@@ -1,0 +1,122 @@
+[
+  {
+    "slug": "index",
+    "title": "Rudder",
+    "group": "Start",
+    "source": "README.md"
+  },
+  {
+    "slug": "how-it-works",
+    "title": "Architecture",
+    "group": "Start",
+    "source": "docs/ARCHITECTURE.md"
+  },
+  {
+    "slug": "architecture",
+    "title": "Architecture",
+    "group": "Design",
+    "source": "docs/ARCHITECTURE.md"
+  },
+  {
+    "slug": "changelog",
+    "title": "Changelog",
+    "group": "Deployment",
+    "source": "docs/CHANGELOG.md"
+  },
+  {
+    "slug": "claims",
+    "title": "Claims",
+    "group": "Start",
+    "source": "docs/CLAIMS.md"
+  },
+  {
+    "slug": "demo",
+    "title": "Demo",
+    "group": "Start",
+    "source": "docs/DEMO.md"
+  },
+  {
+    "slug": "deployments",
+    "title": "Deployments",
+    "group": "Deployment",
+    "source": "docs/DEPLOYMENTS.md"
+  },
+  {
+    "slug": "evidence",
+    "title": "Evidence",
+    "group": "Assurance",
+    "source": "docs/EVIDENCE.md"
+  },
+  {
+    "slug": "feedback",
+    "title": "Feedback: Uniswap v4 Developer Friction (Rudder, UHI11)",
+    "group": "Assurance",
+    "source": "docs/FEEDBACK.md"
+  },
+  {
+    "slug": "known_limitations",
+    "title": "Known Limitations",
+    "group": "Start",
+    "source": "docs/KNOWN_LIMITATIONS.md"
+  },
+  {
+    "slug": "mandate",
+    "title": "Mandate",
+    "group": "Start",
+    "source": "docs/MANDATE.md"
+  },
+  {
+    "slug": "open_questions",
+    "title": "Open Questions",
+    "group": "Start",
+    "source": "docs/OPEN_QUESTIONS.md"
+  },
+  {
+    "slug": "review_findings",
+    "title": "Review findings",
+    "group": "Start",
+    "source": "docs/REVIEW_FINDINGS.md"
+  },
+  {
+    "slug": "threat_model",
+    "title": "Threat Model: Rudder",
+    "group": "Start",
+    "source": "docs/THREAT_MODEL.md"
+  },
+  {
+    "slug": "video",
+    "title": "Demo video outline",
+    "group": "Start",
+    "source": "docs/VIDEO.md"
+  },
+  {
+    "slug": "prior-art",
+    "title": "Prior art",
+    "group": "Design",
+    "source": "docs/prior-art.md"
+  },
+  {
+    "slug": "adr/adr-001-architecture",
+    "title": "ADR-001: Rudder Architecture",
+    "group": "Design",
+    "source": "docs/adr/ADR-001-architecture.md"
+  },
+  {
+    "slug": "adr/adr-002-oracle-and-rebalance-swap",
+    "title": "ADR-002: Oracle, Rebalance Swap, and Hook-Native Envelope Enforcement",
+    "group": "Design",
+    "source": "docs/adr/ADR-002-oracle-and-rebalance-swap.md"
+  },
+  {
+    "slug": "adr/adr-003-protocol-nav-loss-floor",
+    "title": "ADR-003: Protocol NAV-loss floor",
+    "group": "Design",
+    "source": "docs/adr/ADR-003-protocol-nav-loss-floor.md"
+  },
+  {
+    "slug": "adr/adr-004-daily-loss-budget",
+    "title": "ADR-004: Daily NAV-loss budget",
+    "group": "Design",
+    "source": "docs/adr/ADR-004-daily-loss-budget.md"
+  }
+]

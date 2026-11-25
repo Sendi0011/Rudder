@@ -1,0 +1,21 @@
+{
+  "envelopes": 2,
+  "k": 30,
+  "lossBoundBpsHundredths": 441108,
+  "maxDrawdownVsHoldBpsHundredths": 11707,
+  "placeboMaxBpsHundredths": 3486,
+  "placeboMeanBpsHundredths": -939,
+  "placeboMinBpsHundredths": -12013,
+  "placeboP25BpsHundredths": -1851,
+  "placeboP50BpsHundredths": -193,
+  "placeboP75BpsHundredths": 377,
+  "placeboSamples": 180,
+  "placeboStdBpsHundredths": 2329,
+  "reactiveBeatsPlaceboMean": false,
+  "reactiveMeanBpsHundredths": -1961,
+  "reactiveVsPlaceboZScoreTimes100": -43,
+  "regimes": 3,
+  "staticMeanBpsHundredths": -2,
+  "worstRebalanceLossBpsHundredths": 9599,
+  "zScoreScale": 100
+}

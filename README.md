@@ -1,5 +1,15 @@
 # Rudder
 
+**Live app:** add the deployed URL here once hosted · **Demo video:** `<placeholder>` (outline in
+[`docs/VIDEO.md`](docs/VIDEO.md)) · **Judge path:** open the frontend at `/try/`, connect a wallet on
+Unichain Sepolia (chain 1301), mint test tokens with the public mint, deposit, see the share preview,
+withdraw, and follow the transaction links. A read-only snapshot replays recorded data when the RPC
+fails.
+
+**Headline number:** in the local placebo sample the reactive mean was **−19.61 bps** against a
+placebo mean of **−9.39 bps** ([`evidence/placebo_curators.json`](evidence/placebo_curators.json)).
+No curator edge is claimed.
+
 A Uniswap v4 hook plus vault system for **curated liquidity**. Curators steer an LP position inside
 an on-chain mandate (an *envelope*); LPs never relinquish custody. Exit always works, and oracle
 badness never blocks withdrawals. <!-- claim:RUD-001 -->

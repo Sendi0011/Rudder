@@ -1,0 +1,41 @@
+{
+  "source": "contracts/src/RudderVault.sol and contracts/src/libraries/EnvelopeLib.sol at deployment commit aabf306",
+  "note": "The checked-out Foundry artifacts predate the daily loss budget. These fragments are merged by scripts/generate-abis.mjs so the generated ABI matches the deployed bytecode.",
+  "RudderVault": {
+    "abi": [
+      {
+        "type": "function",
+        "name": "lossBucket",
+        "inputs": [],
+        "outputs": [{ "name": "", "type": "uint256", "internalType": "uint256" }],
+        "stateMutability": "view"
+      },
+      {
+        "type": "function",
+        "name": "lastBucketUpdate",
+        "inputs": [],
+        "outputs": [{ "name": "", "type": "uint48", "internalType": "uint48" }],
+        "stateMutability": "view"
+      },
+      {
+        "type": "event",
+        "anonymous": false,
+        "name": "LossBucketUpdated",
+        "inputs": [
+          { "name": "strategyId", "type": "uint256", "indexed": true, "internalType": "uint256" },
+          { "name": "costMicroBps", "type": "uint256", "indexed": false, "internalType": "uint256" },
+          { "name": "bucketAfterMicroBps", "type": "uint256", "indexed": false, "internalType": "uint256" }
+        ]
+      },
+      {
+        "type": "error",
+        "name": "DailyNavLossBudgetExceeded",
+        "inputs": [
+          { "name": "bucket", "type": "uint256", "internalType": "uint256" },
+          { "name": "cost", "type": "uint256", "internalType": "uint256" },
+          { "name": "capacity", "type": "uint256", "internalType": "uint256" }
+        ]
+      }
+    ]
+  }
+}
