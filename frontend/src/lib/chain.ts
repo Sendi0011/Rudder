@@ -4,7 +4,10 @@ import seed from "@/data/seed.json";
 
 export const CHAIN_ID = 1301 as const;
 
-export const migratorAddress = (process.env.NEXT_PUBLIC_MIGRATOR_ADDRESS || "") as `0x${string}` | "";
+const deploymentMigrator = deployments.vaultMigrator as `0x${string}` | undefined;
+const envMigrator = process.env.NEXT_PUBLIC_MIGRATOR_ADDRESS as `0x${string}` | undefined;
+
+export const migratorAddress = (envMigrator || deploymentMigrator || "") as `0x${string}` | "";
 
 export const rpcUrl =
   process.env.NEXT_PUBLIC_UNICHAIN_SEPOLIA_RPC_URL || "https://sepolia.unichain.org";

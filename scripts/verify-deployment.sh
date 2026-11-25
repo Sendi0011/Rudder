@@ -48,6 +48,7 @@ keys = {
     "StrategyRegistry": "strategyRegistry",
     "RudderVault implementation": "vaultImplementation",
     "VaultFactory": "vaultFactory",
+    "VaultMigrator": "vaultMigrator",
     "PoolManager": "poolManager",
 }
 
@@ -56,6 +57,7 @@ artifact_contracts = {
     "StrategyRegistry": "StrategyRegistry",
     "RudderVault implementation": "RudderVault",
     "VaultFactory": "VaultFactory",
+    "VaultMigrator": "VaultMigrator",
 }
 
 

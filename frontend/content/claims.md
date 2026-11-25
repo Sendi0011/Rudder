@@ -53,4 +53,4 @@ priority. Deployment state is in [DEPLOYMENTS.md](/docs/deployments/).
 
 ---
 
-Rendered from commit a9f574526cbe24e489e60502caf06053d545de35 · [View source](https://github.com/Sendi0011/Rudder/blob/a9f574526cbe24e489e60502caf06053d545de35/docs/CLAIMS.md)
+Rendered from commit 5b32e45ae598940f532367a3840275bf257be677 · [View source](https://github.com/Sendi0011/Rudder/blob/5b32e45ae598940f532367a3840275bf257be677/docs/CLAIMS.md)

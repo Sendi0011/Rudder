@@ -30,6 +30,7 @@ with `WRITE_DEPLOYMENTS=1`. Run dry runs with `WRITE_DEPLOYMENTS=0`.
 | StrategyRegistry | `0x5C0638eaff9F0288a5FCe0589739f90f8E81D2f3` | [sepolia.uniscan.xyz](https://sepolia.uniscan.xyz/address/0x5c0638eaff9f0288a5fce0589739f90f8e81d2f3) |
 | RudderVault implementation | `0x8A4e537889725c4A90F652657a9911B07D85FCb1` | [sepolia.uniscan.xyz](https://sepolia.uniscan.xyz/address/0x8a4e537889725c4a90f652657a9911b07d85fcb1) |
 | VaultFactory | `0xef7e8C81a7B5c23D70390B481f30524b9C98cC0b` | [sepolia.uniscan.xyz](https://sepolia.uniscan.xyz/address/0xef7e8c81a7b5c23d70390b481f30524b9c98cc0b) |
+| VaultMigrator | `0xD8bd8901d773F877b99d9e062435fA86C9eb2b91` | [sepolia.uniscan.xyz](https://sepolia.uniscan.xyz/address/0xd8bd8901d773f877b99d9e062435fa86c9eb2b91) |
 | PoolManager | `0x00B036B58a818B1BC34d502D3fE730Db729e62AC` | [sepolia.uniscan.xyz](https://sepolia.uniscan.xyz/address/0x00b036b58a818b1bc34d502d3fe730db729e62ac) |
 | Token0 | `0x1474d31bf469dEd9cae717CEDCF7F04e0F7aFc3b` | [sepolia.uniscan.xyz](https://sepolia.uniscan.xyz/address/0x1474d31bf469ded9cae717cedcf7f04e0f7afc3b) |
 | Token1 | `0x38cC31de13281F81e4b88aEC290FE28616c5c4e6` | [sepolia.uniscan.xyz](https://sepolia.uniscan.xyz/address/0x38cc31de13281f81e4b88aec290fe28616c5c4e6) |
@@ -48,6 +49,10 @@ From `broadcast/Deploy.s.sol/1301/run-latest.json` (not committed):
 - `0x2c9760e1427c3e7099a08cbfba6245961a318b6a5b730d00216825daf519d006` — VaultFactory
 - `0x66648e2b8021f89c0b3c77a1e780ff09e7d4f10f27e38f0297b730e2c0dac58e` — `hook.setVaultFactory`
 - `0xc8e822588bfd37eb0624365fb4d1d395f2359d8dabc040571280d4d4cb4adb2d` — `registry.setFactory`
+
+VaultMigrator was broadcast separately with `forge create` on `2026-11-25` from commit `5b32e45`:
+
+- `0xff07230c4624527237a193aaa7f8496f3a3fddbab734014e198f72e0c86933fb` — VaultMigrator deployment
 
 From `broadcast/Seed.s.sol/1301/run-latest.json` (not committed):
 
@@ -123,6 +128,7 @@ PID `38522` (also in the run directory). Stop it with `kill 38522`. `activity.lo
 | RudderVault implementation | `fsvc6bt35fjvqpwjtfjdkcj8mggjx5pqxbmhsxcxezemfiwi7y` | [link](https://sepolia.uniscan.xyz/address/0x8a4e537889725c4a90f652657a9911b07d85fcb1) |
 | VaultFactory | `uqy7x49pqpj9xzrjye3mtv3dqmywuekydybysrehzu7pc5tfvk` | [link](https://sepolia.uniscan.xyz/address/0xef7e8c81a7b5c23d70390b481f30524b9c98cc0b) |
 | RudderHook | `jifk6ymjibvdubwmxzpitzaldypf2jut19ucjhtdlyiummawtr` | [link](https://sepolia.uniscan.xyz/address/0x19e5c142ef99698474e51e0cbcdff768816c8880) |
+| VaultMigrator | `hiphgxqcutlkb7wzhzu5y2tt34k5mvtw83jtjvptrd3dccbbtv` | [link](https://sepolia.uniscan.xyz/address/0xd8bd8901d773f877b99d9e062435fa86c9eb2b91) |
 
 ## Verification log
 
@@ -144,11 +150,13 @@ $ bash scripts/verify-deployment.sh --phase deploy
 | runtime code: StrategyRegistry | PASS | 7004 bytes |
 | runtime code: RudderVault implementation | PASS | 18077 bytes |
 | runtime code: VaultFactory | PASS | 2568 bytes |
+| runtime code: VaultMigrator | PASS | 1549 bytes |
 | runtime code: PoolManager | PASS | 24009 bytes |
 | code hash: RudderHook | PASS | 5 immutable spans zeroed |
 | code hash: StrategyRegistry | PASS | 0 immutable spans zeroed |
 | code hash: RudderVault implementation | PASS | 0 immutable spans zeroed |
 | code hash: VaultFactory | PASS | 8 immutable spans zeroed |
+| code hash: VaultMigrator | PASS | 0 immutable spans zeroed |
 | hook owner | PASS | 0xf55ad1AcDd9fE5b307F330ccD4D685A3040fb526 |
 | factory hook | PASS | 0x19e5C142eF99698474E51E0CBcDFF768816c8880 |
 | hook factory | PASS | 0xef7e8C81a7B5c23D70390B481f30524b9C98cC0b |
@@ -163,23 +171,26 @@ $ bash scripts/verify-deployment.sh --phase full
 | README address: StrategyRegistry | PASS | 0x5C0638eaff9F0288a5FCe0589739f90f8E81D2f3 |
 | README address: RudderVault implementation | PASS | 0x8A4e537889725c4A90F652657a9911B07D85FCb1 |
 | README address: VaultFactory | PASS | 0xef7e8C81a7B5c23D70390B481f30524b9C98cC0b |
+| README address: VaultMigrator | PASS | 0xD8bd8901d773F877b99d9e062435fA86C9eb2b91 |
 | README address: PoolManager | PASS | 0x00B036B58a818B1BC34d502D3fE730Db729e62AC |
 | runtime code: RudderHook | PASS | 7987 bytes |
 | runtime code: StrategyRegistry | PASS | 7004 bytes |
 | runtime code: RudderVault implementation | PASS | 18077 bytes |
 | runtime code: VaultFactory | PASS | 2568 bytes |
+| runtime code: VaultMigrator | PASS | 1549 bytes |
 | runtime code: PoolManager | PASS | 24009 bytes |
 | code hash: RudderHook | PASS | 5 immutable spans zeroed |
 | code hash: StrategyRegistry | PASS | 0 immutable spans zeroed |
 | code hash: RudderVault implementation | PASS | 0 immutable spans zeroed |
 | code hash: VaultFactory | PASS | 8 immutable spans zeroed |
+| code hash: VaultMigrator | PASS | 0 immutable spans zeroed |
 | hook owner | PASS | 0xf55ad1AcDd9fE5b307F330ccD4D685A3040fb526 |
 | factory hook | PASS | 0x19e5C142eF99698474E51E0CBcDFF768816c8880 |
 | hook factory | PASS | 0xef7e8C81a7B5c23D70390B481f30524b9C98cC0b |
 | hook pool manager | PASS | 0x00B036B58a818B1BC34d502D3fE730Db729e62AC |
 | registry factory | PASS | 0xef7e8C81a7B5c23D70390B481f30524b9C98cC0b |
 | oracle ready after activity | PASS | true |
-DEPLOYMENTS_OK: 5 addresses
+DEPLOYMENTS_OK: 6 addresses
 ```
 
 The check prints a pass/fail table and exits non-zero on any failure. It compares the README with the
@@ -190,4 +201,4 @@ runtime before hashing, so constructor-bound addresses are ignored. It does not 
 
 ---
 
-Rendered from commit a9f574526cbe24e489e60502caf06053d545de35 · [View source](https://github.com/Sendi0011/Rudder/blob/a9f574526cbe24e489e60502caf06053d545de35/docs/DEPLOYMENTS.md)
+Rendered from commit 5b32e45ae598940f532367a3840275bf257be677 · [View source](https://github.com/Sendi0011/Rudder/blob/5b32e45ae598940f532367a3840275bf257be677/docs/DEPLOYMENTS.md)

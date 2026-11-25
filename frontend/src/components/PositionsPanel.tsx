@@ -240,7 +240,7 @@ export default function PositionsPanel() {
       <p className="mt-6 text-sm text-slate">
         {migrator
           ? `Migrator: ${shortAddress(migrator)} · moves a full position in one signed transaction.`
-          : `The migrator is not in the deployment record for chain ${formatCount(CHAIN_ID)}. Set NEXT_PUBLIC_MIGRATOR_ADDRESS only after verifying its address.`}
+          : `The migrator is not in the deployment record for chain ${formatCount(CHAIN_ID)}. Verify a VaultMigrator before setting NEXT_PUBLIC_MIGRATOR_ADDRESS.`}
       </p>
     </section>
   );
