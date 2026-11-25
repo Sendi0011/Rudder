@@ -1,0 +1,32 @@
+{
+  "conservative": {
+    "IntervalSeconds": 3600,
+    "NavLossFloorBps": 50,
+    "DailyBudgetBps": 200,
+    "HorizonSeconds": 86400,
+    "BoundBps": 200,
+    "ObservedBps": 198,
+    "MaxObservedCostBps": 31,
+    "Rebalances": 16
+  },
+  "balanced": {
+    "IntervalSeconds": 1800,
+    "NavLossFloorBps": 100,
+    "DailyBudgetBps": 500,
+    "HorizonSeconds": 86400,
+    "BoundBps": 500,
+    "ObservedBps": 495,
+    "MaxObservedCostBps": 31,
+    "Rebalances": 33
+  },
+  "aggressive": {
+    "IntervalSeconds": 600,
+    "NavLossFloorBps": 200,
+    "DailyBudgetBps": 1000,
+    "HorizonSeconds": 86400,
+    "BoundBps": 1000,
+    "ObservedBps": 983,
+    "MaxObservedCostBps": 32,
+    "Rebalances": 89
+  }
+}

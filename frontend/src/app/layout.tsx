@@ -3,6 +3,7 @@ import { Bricolage_Grotesque, IBM_Plex_Sans } from "next/font/google";
 import "./globals.css";
 import SiteHeader from "@/components/SiteHeader";
 import SiteFooter from "@/components/SiteFooter";
+import Providers from "@/lib/providers";
 
 const display = Bricolage_Grotesque({
   subsets: ["latin"],
@@ -30,14 +31,16 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="en" className={`${display.variable} ${plex.variable}`}>
       <body>
-        <a className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:bg-paper focus:px-3 focus:py-2" href="#main">
-          Skip to content
-        </a>
-        <SiteHeader />
-        <main id="main" className="shell pb-24">
-          {children}
-        </main>
-        <SiteFooter />
+        <Providers>
+          <a className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:bg-paper focus:px-3 focus:py-2" href="#main">
+            Skip to content
+          </a>
+          <SiteHeader />
+          <main id="main" className="shell pb-24">
+            {children}
+          </main>
+          <SiteFooter />
+        </Providers>
       </body>
     </html>
   );

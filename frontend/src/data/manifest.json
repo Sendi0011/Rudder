@@ -1,0 +1,18 @@
+{
+  "generatedBy": "scripts/copy-data.mjs",
+  "sources": [
+    "contracts/deployments.json",
+    "contracts/seed.json",
+    "evidence/churner_alpha.json",
+    "evidence/deposit_guard.json",
+    "evidence/flow_invariance.json",
+    "evidence/invariant_runs.json",
+    "evidence/oracle_gas.json",
+    "evidence/placebo_curators.json",
+    "evidence/prior_art_search.json",
+    "evidence/rebalance_alpha_cost.json",
+    "evidence/rebalance_bounds.json",
+    "evidence/twap_accuracy.json",
+    "evidence/worst_case_loss.json"
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "runs": 64,
+  "depth": 128,
+  "beforeHandlerCalls": 887,
+  "beforeHandlerReverts": 9,
+  "beforeRevertRateBps": 101,
+  "afterHandlerCalls": 897,
+  "afterHandlerReverts": 9,
+  "afterRevertRateBps": 100,
+  "targetRevertRateBps": 3000
+}

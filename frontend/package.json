@@ -3,6 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "sync:abis": "node scripts/generate-abis.mjs",
+    "sync:data": "node scripts/copy-data.mjs",
+    "prebuild": "npm run sync:abis && npm run sync:data",
+    "predev": "npm run sync:abis && npm run sync:data",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
