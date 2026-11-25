@@ -18,9 +18,9 @@ and then wait the existing timelock.
 
 `RudderVault` keeps a per-vault leaky bucket in micro-bps. Capacity is half the budget, refill is
 capacity spread evenly over the horizon recorded in
-[`evidence/worst_case_loss.json`](https://github.com/Sendi0011/Rudder/raw/b599bb68a1020923f1b4d0375a05eac030f1d616/docs/evidence/worst_case_loss.json), and a successful rebalance is
+[`evidence/worst_case_loss.json`](https://github.com/Sendi0011/Rudder/raw/b70d05cbe6a8f8d7013b018a41c0559c72ee1749/docs/evidence/worst_case_loss.json), and a successful rebalance is
 charged the rounded-up TWAP NAV-loss fraction. The capacity, refill and rounding constants are
-exercised by the mutants in [`evidence/mutation.md`](https://github.com/Sendi0011/Rudder/blob/b599bb68a1020923f1b4d0375a05eac030f1d616/docs/evidence/mutation.md). A charge above
+exercised by the mutants in [`evidence/mutation.md`](https://github.com/Sendi0011/Rudder/blob/b70d05cbe6a8f8d7013b018a41c0559c72ee1749/docs/evidence/mutation.md). A charge above
 capacity reverts the whole rebalance and emits no bucket update. Deposits, withdrawals and alpha
 poking never read or write the bucket.
 
@@ -29,7 +29,7 @@ the starting capacity plus the refill accrued in that horizon. Over the recorded
 cannot restore more than the daily budget, so the sum of charged losses stays inside that budget.
 The multiplicative loss from a chain of rebalances is no larger than the sum of its parts, so the
 additive budget also bounds compounded accounting loss. The seeded budgets, observed charges and
-rebalance counts are in [`evidence/worst_case_loss.json`](https://github.com/Sendi0011/Rudder/raw/b599bb68a1020923f1b4d0375a05eac030f1d616/docs/evidence/worst_case_loss.json).
+rebalance counts are in [`evidence/worst_case_loss.json`](https://github.com/Sendi0011/Rudder/raw/b70d05cbe6a8f8d7013b018a41c0559c72ee1749/docs/evidence/worst_case_loss.json).
 
 ## Scope
 
@@ -44,9 +44,9 @@ A fixed calendar-day reset was rejected. A reset at a wall-clock boundary lets a
 whole allowance immediately before and immediately after the boundary, giving a short-window loss
 far above the intended daily allowance. Continuous refill spreads the allowance across time, and a
 rolling-window invariant in
-[`VaultInvariants.t.sol`](https://github.com/Sendi0011/Rudder/raw/b599bb68a1020923f1b4d0375a05eac030f1d616/docs/contracts/test/VaultInvariants.t.sol) enforces that behavior across
+[`VaultInvariants.t.sol`](https://github.com/Sendi0011/Rudder/raw/b70d05cbe6a8f8d7013b018a41c0559c72ee1749/docs/contracts/test/VaultInvariants.t.sol) enforces that behavior across
 charge histories.
 
 ---
 
-Rendered from commit b599bb68a1020923f1b4d0375a05eac030f1d616 · [View source](https://github.com/Sendi0011/Rudder/blob/b599bb68a1020923f1b4d0375a05eac030f1d616/docs/adr/ADR-004-daily-loss-budget.md)
+Rendered from commit b70d05cbe6a8f8d7013b018a41c0559c72ee1749 · [View source](https://github.com/Sendi0011/Rudder/blob/b70d05cbe6a8f8d7013b018a41c0559c72ee1749/docs/adr/ADR-004-daily-loss-budget.md)

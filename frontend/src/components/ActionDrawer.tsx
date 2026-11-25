@@ -21,6 +21,7 @@ interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   defaultCuratorId?: number;
+  defaultTab?: "deposit" | "withdraw";
 }
 
 function toUnits(value: string): bigint | null {
@@ -32,7 +33,7 @@ function toUnits(value: string): bigint | null {
   }
 }
 
-export default function ActionDrawer({ open, onOpenChange, defaultCuratorId = 0 }: Props) {
+export default function ActionDrawer({ open, onOpenChange, defaultCuratorId = 0, defaultTab = "deposit" }: Props) {
   const { data } = useChainData();
   const { address, chainId, isConnected } = useAccount();
   const publicClient = usePublicClient({ chainId: unichainSepolia.id });
@@ -49,8 +50,12 @@ export default function ActionDrawer({ open, onOpenChange, defaultCuratorId = 0 
   );
 
   useEffect(() => {
-    if (open) setCuratorId(defaultCuratorId);
-  }, [open, defaultCuratorId]);
+    if (open) {
+      setCuratorId(defaultCuratorId);
+      setTab(defaultTab);
+      setResult(null);
+    }
+  }, [open, defaultCuratorId, defaultTab]);
 
   const curator = data.curators.find((entry) => entry.id === curatorId) ?? data.curators[0];
   const vault = (curator?.vault ?? addresses.vaults[0] ?? zeroAddress) as `0x${string}`;

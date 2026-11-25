@@ -27,6 +27,9 @@ export default function TryItPanel() {
       <Link className="mt-3 block text-sm text-slate underline" href="/docs/how-it-works/">
         Read how it works first
       </Link>
+      <Link className="mt-2 block text-sm text-ink underline" href="/try/">
+        Open the full judge path
+      </Link>
       <ActionDrawer open={open} onOpenChange={setOpen} />
     </aside>
   );
