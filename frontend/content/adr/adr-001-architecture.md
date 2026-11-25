@@ -20,4 +20,4 @@ Rounding favors vault and remaining LPs.
 
 ---
 
-Rendered from commit cee9100a4c4fa976728806331a6177b82c568d6d · [View source](https://github.com/Sendi0011/Rudder/blob/cee9100a4c4fa976728806331a6177b82c568d6d/docs/adr/ADR-001-architecture.md)
+Rendered from commit a9f574526cbe24e489e60502caf06053d545de35 · [View source](https://github.com/Sendi0011/Rudder/blob/a9f574526cbe24e489e60502caf06053d545de35/docs/adr/ADR-001-architecture.md)
