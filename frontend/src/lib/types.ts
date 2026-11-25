@@ -49,6 +49,7 @@ export interface ChainSnapshot {
   rebalances: RebalanceRecord[];
   oracle: OracleState;
   rankedCount: bigint;
+  twap: { secondsAgo: number; tick: number }[];
 }
 
 export interface ChartPoint {

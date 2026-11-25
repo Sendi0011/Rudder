@@ -35,4 +35,5 @@ export const snapshot: ChainSnapshot = {
     maxAgeSeconds: raw.oracle.maxAgeSeconds,
     paused: raw.oracle.paused,
   },
+  twap: raw.twap.map((entry) => ({ secondsAgo: entry.secondsAgo, tick: entry.tick })),
 };

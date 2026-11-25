@@ -8,8 +8,8 @@
   --color-cobalt: #2c4bd6;
   --color-signal: #d2392b;
   --color-rule: #c5cfd7;
-  --font-heading: var(--font-display), "Bricolage Grotesque", sans-serif;
-  --font-body: var(--font-plex), "IBM Plex Sans", sans-serif;
+  --font-heading: "Bricolage Grotesque", sans-serif;
+  --font-body: "IBM Plex Sans", sans-serif;
 }
 
 :root {
@@ -25,7 +25,7 @@ body {
   background-color: var(--color-paper);
   background-image: var(--paper-grid);
   color: var(--color-ink);
-  font-family: var(--font-body), "IBM Plex Sans", sans-serif;
+  font-family: var(--font-body);
   font-variant-numeric: tabular-nums;
   -webkit-font-smoothing: antialiased;
 }
@@ -34,7 +34,7 @@ h1,
 h2,
 h3,
 h4 {
-  font-family: var(--font-heading), "Bricolage Grotesque", sans-serif;
+  font-family: var(--font-heading);
   font-weight: 600;
   letter-spacing: -0.025em;
   text-wrap: balance;
@@ -74,7 +74,7 @@ a {
 }
 
 .figure {
-  font-family: var(--font-heading), "Bricolage Grotesque", sans-serif;
+  font-family: var(--font-heading);
   font-size: clamp(2rem, 4vw, 3.4rem);
   line-height: 1;
   letter-spacing: -0.04em;
@@ -181,6 +181,26 @@ a {
 
 .dot-breach {
   background: var(--color-signal);
+}
+
+.chart-draw {
+  stroke-dasharray: 1600;
+  stroke-dashoffset: 1600;
+  animation: chart-draw 1100ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@keyframes chart-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chart-draw {
+    stroke-dasharray: none;
+    stroke-dashoffset: 0;
+    animation: none;
+  }
 }
 
 @media (max-width: 640px) {

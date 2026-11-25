@@ -9,6 +9,7 @@ import { StrategyRegistryAbi } from "@/abis/StrategyRegistry";
 import { addresses, CHAIN_ID, poolKey } from "@/lib/chain";
 import { snapshot } from "@/lib/snapshot";
 import type { ChainSnapshot, Curator, Envelope, RebalanceRecord } from "@/lib/types";
+import { readTwapAtOffset } from "@/lib/vaultData";
 
 const DEPLOYMENT_BLOCK = 68_669_835n;
 const MAX_LOG_BLOCKS = 1000n;
@@ -133,11 +134,24 @@ async function fetchLive(client: PublicClient): Promise<ChainSnapshot> {
     rebalances = snapshot.rebalances;
   }
 
+  let twap = snapshot.twap;
+  try {
+    twap = await Promise.all(
+      [0, 300, 600, 900, 1200, 1500, 1800].map(async (secondsAgo) => ({
+        secondsAgo,
+        tick: (await readTwapAtOffset(client, secondsAgo)).tick,
+      })),
+    );
+  } catch {
+    twap = snapshot.twap;
+  }
+
   return {
     source: "live",
     curators: rows,
     rankedCount,
     rebalances,
+    twap,
     oracle: {
       ready,
       samples,

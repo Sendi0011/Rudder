@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import CorridorChart from "@/components/CorridorChart";
 import LimitsTable, { type LimitUsage } from "@/components/LimitsTable";
 import { ChainStatus, EmptyPanel, LoadingPanel } from "@/components/StatePanels";
 import { useChainData } from "@/lib/chainData";
@@ -71,7 +72,11 @@ export default function CuratorDetail({ id }: { id: number }) {
         <span>TWAP tick: {formatCount(twapTick)}</span>
       </div>
 
-      <div className="mt-12">
+      <div className="mt-10 border-y border-rule py-3">
+        <CorridorChart data={data} curator={curator} />
+      </div>
+
+      <div className="mt-14">
         <LimitsTable envelope={curator.envelope} usage={usage} />
       </div>
 

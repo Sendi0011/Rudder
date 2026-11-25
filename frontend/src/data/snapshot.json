@@ -103,5 +103,14 @@
     "lastTickCumulative": "-3504",
     "maxAgeSeconds": 3600,
     "paused": false
-  }
+  },
+  "twap": [
+    { "secondsAgo": 0, "tick": -1 },
+    { "secondsAgo": 300, "tick": 0 },
+    { "secondsAgo": 600, "tick": 0 },
+    { "secondsAgo": 900, "tick": 0 },
+    { "secondsAgo": 1200, "tick": 0 },
+    { "secondsAgo": 1500, "tick": 0 },
+    { "secondsAgo": 1800, "tick": 0 }
+  ]
 }

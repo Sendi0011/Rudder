@@ -1,4 +1,5 @@
 import Link from "next/link";
+import HomeCorridor from "@/components/HomeCorridor";
 
 export default function HomePage() {
   return (
@@ -8,15 +9,7 @@ export default function HomePage() {
         Curators steer a liquidity range inside published on-chain limits, and every move outside those limits is rejected.
       </h1>
       <div className="mt-12 grid gap-10 border-t border-rule pt-8 lg:grid-cols-[1.6fr_1fr]">
-        <section aria-labelledby="corridor-heading">
-          <h2 id="corridor-heading" className="text-xl">
-            The live corridor
-          </h2>
-          <p className="mt-2 max-w-xl text-slate">
-            Price, the allowed band and the vault&apos;s actual range, drawn on one chart. The chart
-            arrives with the corridor visualization in the next pass.
-          </p>
-        </section>
+        <HomeCorridor />
         <aside aria-labelledby="try-heading" className="border-l-0 lg:border-l lg:border-rule lg:pl-8">
           <h2 id="try-heading" className="text-xl">
             Try it
