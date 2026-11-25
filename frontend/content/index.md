@@ -7,7 +7,7 @@ withdraw, and follow the transaction links. A read-only snapshot replays recorde
 fails.
 
 **Headline number:** in the local placebo sample the reactive mean was **−19.61 bps** against a
-placebo mean of **−9.39 bps** ([`evidence/placebo_curators.json`](https://github.com/Sendi0011/Rudder/raw/3212ad666f4f528fc441666739df78ba7be5182b/evidence/placebo_curators.json)).
+placebo mean of **−9.39 bps** ([`evidence/placebo_curators.json`](https://github.com/Sendi0011/Rudder/raw/b599bb68a1020923f1b4d0375a05eac030f1d616/evidence/placebo_curators.json)).
 No curator edge is claimed.
 
 A Uniswap v4 hook plus vault system for **curated liquidity**. Curators steer an LP position inside
@@ -62,32 +62,32 @@ Local measurements from `FOUNDRY_PROFILE=ci forge test --match-contract Evidence
 
 - Oracle lookup gas: **9,583** early and **17,316** at capacity; the ring holds **2,048** observations,
   the TWAP window is **1,800** seconds, and the freshness bound is **3,600** seconds
-  ([`evidence/oracle_gas.json`](https://github.com/Sendi0011/Rudder/raw/3212ad666f4f528fc441666739df78ba7be5182b/evidence/oracle_gas.json)). <!-- claim:RUD-007 -->
+  ([`evidence/oracle_gas.json`](https://github.com/Sendi0011/Rudder/raw/b599bb68a1020923f1b4d0375a05eac030f1d616/evidence/oracle_gas.json)). <!-- claim:RUD-007 -->
 - TWAP step response: spot moved from tick **-1** to **817** while the **1,800**-second TWAP read
   **135** after **30** observations, a **682**-tick gap from spot and **67** bps sqrt-price deviation
-  ([`evidence/twap_accuracy.json`](https://github.com/Sendi0011/Rudder/raw/3212ad666f4f528fc441666739df78ba7be5182b/evidence/twap_accuracy.json)). <!-- claim:RUD-008 -->
+  ([`evidence/twap_accuracy.json`](https://github.com/Sendi0011/Rudder/raw/b599bb68a1020923f1b4d0375a05eac030f1d616/evidence/twap_accuracy.json)). <!-- claim:RUD-008 -->
 - Rebalance mandate: width **600** ticks, centre shift **0** ticks, elapsed **20** seconds since the
-  prior rebalance, and NAV change **-5** bps ([`evidence/rebalance_bounds.json`](https://github.com/Sendi0011/Rudder/raw/3212ad666f4f528fc441666739df78ba7be5182b/evidence/rebalance_bounds.json)). <!-- claim:RUD-009 -->
+  prior rebalance, and NAV change **-5** bps ([`evidence/rebalance_bounds.json`](https://github.com/Sendi0011/Rudder/raw/b599bb68a1020923f1b4d0375a05eac030f1d616/evidence/rebalance_bounds.json)). <!-- claim:RUD-009 -->
 - Deposit guard: manipulated spot deviated **109** bps against a **50** bps envelope cap and **50** bps
-  protocol cap before `SpotTwapDeviation` ([`evidence/deposit_guard.json`](https://github.com/Sendi0011/Rudder/raw/3212ad666f4f528fc441666739df78ba7be5182b/evidence/deposit_guard.json)). <!-- claim:RUD-010 -->
+  protocol cap before `SpotTwapDeviation` ([`evidence/deposit_guard.json`](https://github.com/Sendi0011/Rudder/raw/b599bb68a1020923f1b4d0375a05eac030f1d616/evidence/deposit_guard.json)). <!-- claim:RUD-010 -->
 - Ranking invariance: vaults at different sizes accrued the same alpha delta of **2,499,874,729,099,975**
   with **0** bps relative difference; mid-window deposit and withdrawal each changed alpha by **0**
-  ([`evidence/flow_invariance.json`](https://github.com/Sendi0011/Rudder/raw/3212ad666f4f528fc441666739df78ba7be5182b/evidence/flow_invariance.json)). <!-- claim:RUD-011 -->
+  ([`evidence/flow_invariance.json`](https://github.com/Sendi0011/Rudder/raw/b599bb68a1020923f1b4d0375a05eac030f1d616/evidence/flow_invariance.json)). <!-- claim:RUD-011 -->
 - Rebalance cost: NAV fell **15** bps and alpha fell **15** bps; the hold basket stayed unchanged
-  ([`evidence/rebalance_alpha_cost.json`](https://github.com/Sendi0011/Rudder/raw/3212ad666f4f528fc441666739df78ba7be5182b/evidence/rebalance_alpha_cost.json)). <!-- claim:RUD-012 -->
+  ([`evidence/rebalance_alpha_cost.json`](https://github.com/Sendi0011/Rudder/raw/b599bb68a1020923f1b4d0375a05eac030f1d616/evidence/rebalance_alpha_cost.json)). <!-- claim:RUD-012 -->
 - Churn ranking: across **3** rebalances the ranking gap was **200** bps against **249** bps summed cost
-  ([`evidence/churner_alpha.json`](https://github.com/Sendi0011/Rudder/raw/3212ad666f4f528fc441666739df78ba7be5182b/evidence/churner_alpha.json)). <!-- claim:RUD-013 -->
+  ([`evidence/churner_alpha.json`](https://github.com/Sendi0011/Rudder/raw/b599bb68a1020923f1b4d0375a05eac030f1d616/evidence/churner_alpha.json)). <!-- claim:RUD-013 -->
 - Daily budget: over an **86,400**-second horizon, the conservative tier pairs a **50** bps NAV-loss
   floor and **3,600**-second interval with a **200** bps budget, **200** bps bound, **198** bps observed
   across **16** rebalances; balanced uses **100** bps, **1,800** seconds, **500** bps, **500** bps,
   **495** bps and **33**; aggressive uses **200** bps, **600** seconds, **1,000** bps, **1,000** bps,
   **983** bps and **89**
-  ([`evidence/worst_case_loss.json`](https://github.com/Sendi0011/Rudder/raw/3212ad666f4f528fc441666739df78ba7be5182b/evidence/worst_case_loss.json)). <!-- claim:RUD-029 --> <!-- claim:RUD-032 -->
+  ([`evidence/worst_case_loss.json`](https://github.com/Sendi0011/Rudder/raw/b599bb68a1020923f1b4d0375a05eac030f1d616/evidence/worst_case_loss.json)). <!-- claim:RUD-029 --> <!-- claim:RUD-032 -->
 - Curator sample: **30** random curators per cell (**180** placebo samples) over **3** regimes and **2**
   envelopes saw reactive **-1961**, static **-2** and placebo **-939** hundredths of a bps, with placebo
   dispersion **2329**, min **-12013**, p25 **-1851**, p50 **-193**, p75 **377**, max **3486**, z-score
   scaled by **100** of **-43**, worst loss **9599** against a **441108** bound and **11707** drawdown
-  ([`evidence/placebo_curators.json`](https://github.com/Sendi0011/Rudder/raw/3212ad666f4f528fc441666739df78ba7be5182b/evidence/placebo_curators.json)). <!-- claim:RUD-030 -->
+  ([`evidence/placebo_curators.json`](https://github.com/Sendi0011/Rudder/raw/b599bb68a1020923f1b4d0375a05eac030f1d616/evidence/placebo_curators.json)). <!-- claim:RUD-030 -->
 
 Fork test against a live network (skipped when the RPC is unset): <!-- claim:RUD-014 -->
 
@@ -295,4 +295,4 @@ Deployed addresses table:
 
 ---
 
-Rendered from commit 3212ad666f4f528fc441666739df78ba7be5182b · [View source](https://github.com/Sendi0011/Rudder/blob/3212ad666f4f528fc441666739df78ba7be5182b/README.md)
+Rendered from commit b599bb68a1020923f1b4d0375a05eac030f1d616 · [View source](https://github.com/Sendi0011/Rudder/blob/b599bb68a1020923f1b4d0375a05eac030f1d616/README.md)

@@ -1,6 +1,6 @@
 # Evidence
 
-Measurement artifacts live under [`evidence/`](https://github.com/Sendi0011/Rudder/blob/3212ad666f4f528fc441666739df78ba7be5182b/evidence/README.md). They are produced by local
+Measurement artifacts live under [`evidence/`](https://github.com/Sendi0011/Rudder/blob/b599bb68a1020923f1b4d0375a05eac030f1d616/evidence/README.md). They are produced by local
 tests with an explicit write switch. A normal `forge test` run does not write them.
 
 ## Measurements
@@ -26,15 +26,15 @@ WRITE_EVIDENCE=1 FOUNDRY_PROFILE=ci forge test --match-contract VaultInvariantsT
 | `invariant_runs.json` | `invariant_ActionsExecuted` | Invariant run settings and action counters |
 
 The `rankingGapBps` and `summedCostBps` fields in
-[`churner_alpha.json`](https://github.com/Sendi0011/Rudder/raw/3212ad666f4f528fc441666739df78ba7be5182b/evidence/churner_alpha.json) come from different measurements. The first is
+[`churner_alpha.json`](https://github.com/Sendi0011/Rudder/raw/b599bb68a1020923f1b4d0375a05eac030f1d616/evidence/churner_alpha.json) come from different measurements. The first is
 the delta between registry alpha scores; the second sums direct pre/post NAV loss. In this run they
 are 200 and 249 bps. The source assertion at
-[`Evidence.t.sol:413-424`](https://github.com/Sendi0011/Rudder/raw/3212ad666f4f528fc441666739df78ba7be5182b/contracts/test/Evidence.t.sol) allows a 40% relative gap, so the figures
+[`Evidence.t.sol:413-424`](https://github.com/Sendi0011/Rudder/raw/b599bb68a1020923f1b4d0375a05eac030f1d616/contracts/test/Evidence.t.sol) allows a 40% relative gap, so the figures
 are reported as tracking within that tolerance, not as equal.
 
 The daily-budget artifact reports each tier's interval, NAV-loss floor, budget, bound, observed
 charged loss and rebalance count over the horizon in
-[`worst_case_loss.json`](https://github.com/Sendi0011/Rudder/raw/3212ad666f4f528fc441666739df78ba7be5182b/evidence/worst_case_loss.json). `ObservedBps` sums charged
+[`worst_case_loss.json`](https://github.com/Sendi0011/Rudder/raw/b599bb68a1020923f1b4d0375a05eac030f1d616/evidence/worst_case_loss.json). `ObservedBps` sums charged
 `LossBucketUpdated` costs rounded up to whole bps, and `BoundBps` is the daily budget. A rebalance
 that is rejected by the bucket is not counted. These are accounting figures, not market drawdown.
 
@@ -45,10 +45,10 @@ that is rejected by the bucket is not counted. These are accounting figures, not
 | Aggressive | 600 s | 200 bps | 1,000 bps | 1,000 bps | 983 bps | 32 bps | 89 |
 
 The largest charged step is 31, 31 and 32 bps against floors of 50, 100 and 200 bps in
-[`worst_case_loss.json`](https://github.com/Sendi0011/Rudder/raw/3212ad666f4f528fc441666739df78ba7be5182b/evidence/worst_case_loss.json). The local maximum-cost swaps do not reach
+[`worst_case_loss.json`](https://github.com/Sendi0011/Rudder/raw/b599bb68a1020923f1b4d0375a05eac030f1d616/evidence/worst_case_loss.json). The local maximum-cost swaps do not reach
 the per-action floor, so the floor is a ceiling in this sample rather than an observed step size.
 
-The [`placebo_curators.json`](https://github.com/Sendi0011/Rudder/raw/3212ad666f4f528fc441666739df78ba7be5182b/evidence/placebo_curators.json) sample uses fixed seeds, exact-input
+The [`placebo_curators.json`](https://github.com/Sendi0011/Rudder/raw/b599bb68a1020923f1b4d0375a05eac030f1d616/evidence/placebo_curators.json) sample uses fixed seeds, exact-input
 swaps and shared local pools. `K` defaults to 30 and can be lowered with `K=n`; the published sample
 uses 30 placebos per cell, giving 180 runs across six scenarios. Every vault is checkpointed with
 `pokeAlpha()` after each price step, so a static or non-rebalancing curator still accrues alpha over
@@ -99,4 +99,4 @@ links one existing artifact, names one command and states one limit.
 
 ---
 
-Rendered from commit 3212ad666f4f528fc441666739df78ba7be5182b · [View source](https://github.com/Sendi0011/Rudder/blob/3212ad666f4f528fc441666739df78ba7be5182b/docs/EVIDENCE.md)
+Rendered from commit b599bb68a1020923f1b4d0375a05eac030f1d616 · [View source](https://github.com/Sendi0011/Rudder/blob/b599bb68a1020923f1b4d0375a05eac030f1d616/docs/EVIDENCE.md)

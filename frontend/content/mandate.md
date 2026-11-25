@@ -37,11 +37,11 @@ zero when no immediate rebalance is allowed. The bound compounds the accounting 
 The daily budget is the spendable allowance behind those per-action floors. `EnvelopeLib.validate`
 rejects a zero budget, a budget above the protocol ceiling and a floor magnitude above half the
 budget. The seeded floors, budgets, intervals and bounds are recorded in
-[`evidence/worst_case_loss.json`](https://github.com/Sendi0011/Rudder/raw/3212ad666f4f528fc441666739df78ba7be5182b/evidence/worst_case_loss.json).
+[`evidence/worst_case_loss.json`](https://github.com/Sendi0011/Rudder/raw/b599bb68a1020923f1b4d0375a05eac030f1d616/evidence/worst_case_loss.json).
 
 `RudderVault` charges each rebalance to a per-vault leaky bucket after the NAV-loss floor passes. The
 bucket starts at zero; its capacity is half the budget and it refills that capacity over the horizon
-recorded in [`evidence/worst_case_loss.json`](https://github.com/Sendi0011/Rudder/raw/3212ad666f4f528fc441666739df78ba7be5182b/evidence/worst_case_loss.json). It rejects a rebalance
+recorded in [`evidence/worst_case_loss.json`](https://github.com/Sendi0011/Rudder/raw/b599bb68a1020923f1b4d0375a05eac030f1d616/evidence/worst_case_loss.json). It rejects a rebalance
 whose rounded-up charge would exceed capacity. A tighter budget lowers capacity immediately without
 clamping the stored bucket; a looser budget must clear the existing timelock. Deposits, withdrawals
 and alpha poking never consult the bucket. The parameter choice and the rejected fixed-window reset
@@ -53,7 +53,7 @@ Only the registered curator for a strategy may change that strategy's envelope. 
 applies a strictly tighter envelope immediately and cancels any pending loosening. A looser change
 must be queued with `queueLoosenEnvelope` and can only be applied by the same curator after
 `LOOSEN_DELAY`; the checks live in
-[`StrategyRegistry.sol:114-140`](https://github.com/Sendi0011/Rudder/raw/3212ad666f4f528fc441666739df78ba7be5182b/contracts/src/StrategyRegistry.sol). The curator has no withdrawal
+[`StrategyRegistry.sol:114-140`](https://github.com/Sendi0011/Rudder/raw/b599bb68a1020923f1b4d0375a05eac030f1d616/contracts/src/StrategyRegistry.sol). The curator has no withdrawal
 or transfer right over LP funds; the registry stores the envelope, curator identity, bound vault and
 alpha samples only.
 
@@ -85,4 +85,4 @@ Claims and their local artifacts are listed in [`CLAIMS.md`](/docs/claims/). Rep
 
 ---
 
-Rendered from commit 3212ad666f4f528fc441666739df78ba7be5182b · [View source](https://github.com/Sendi0011/Rudder/blob/3212ad666f4f528fc441666739df78ba7be5182b/docs/MANDATE.md)
+Rendered from commit b599bb68a1020923f1b4d0375a05eac030f1d616 · [View source](https://github.com/Sendi0011/Rudder/blob/b599bb68a1020923f1b4d0375a05eac030f1d616/docs/MANDATE.md)
