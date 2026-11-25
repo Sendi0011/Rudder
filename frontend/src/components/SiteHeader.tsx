@@ -1,4 +1,5 @@
 import Link from "next/link";
+import WalletButton from "@/components/WalletButton";
 
 const links = [
   { href: "/curators/", label: "Curators" },
@@ -22,7 +23,10 @@ export default function SiteHeader() {
           <span className="font-heading text-[1.6rem] font-semibold leading-none tracking-tight">Rudder</span>
           <span className="hidden text-sm text-slate sm:inline">bounded liquidity, visible limits</span>
         </Link>
-        <span className="eyebrow">Unichain Sepolia · chain 1301</span>
+        <div className="flex items-center gap-4">
+          <span className="eyebrow">Unichain Sepolia · chain 1301</span>
+          <WalletButton />
+        </div>
       </div>
       <nav aria-label="Main navigation" className="-mx-1 mt-5 flex gap-1 overflow-x-auto pb-3">
         {links.map((link) => (
