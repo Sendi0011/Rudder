@@ -1,0 +1,107 @@
+{
+  "recordedAt": "2026-11-25T07:16:00Z",
+  "chainId": 1301,
+  "source": "read-only eth_call and eth_getLogs against the public Unichain Sepolia RPC",
+  "curators": [
+    {
+      "id": 0,
+      "curator": "0xf55ad1AcDd9fE5b307F330ccD4D685A3040fb526",
+      "vault": "0x86fB893C2Dcb9EB5f16d8Fb641E827C610CA1f89",
+      "alpha": "0",
+      "alphaSamples": "0",
+      "shares": "200000000000000000000",
+      "tickLower": -600,
+      "tickUpper": 600,
+      "lastRebalanceTimestamp": 1795522746,
+      "envelope": {
+        "maxRangeWidth": 1200,
+        "maxCenterShift": 600,
+        "maxTwapDistanceTicks": 1200,
+        "minRebalanceInterval": 3600,
+        "maxPriceImpactBps": 200,
+        "maxNavLossBps": -50,
+        "maxDailyNavLossBps": 200
+      }
+    },
+    {
+      "id": 1,
+      "curator": "0xf55ad1AcDd9fE5b307F330ccD4D685A3040fb526",
+      "vault": "0xBFe8aD7DBF787bac8b49B85A922A641B85c33576",
+      "alpha": "0",
+      "alphaSamples": "0",
+      "shares": "200000000000000000000",
+      "tickLower": -1200,
+      "tickUpper": 1200,
+      "lastRebalanceTimestamp": 1795522763,
+      "envelope": {
+        "maxRangeWidth": 2400,
+        "maxCenterShift": 1200,
+        "maxTwapDistanceTicks": 2400,
+        "minRebalanceInterval": 1800,
+        "maxPriceImpactBps": 500,
+        "maxNavLossBps": -100,
+        "maxDailyNavLossBps": 500
+      }
+    },
+    {
+      "id": 2,
+      "curator": "0xf55ad1AcDd9fE5b307F330ccD4D685A3040fb526",
+      "vault": "0xd9Ff3a77F9BD96D8De9E96ba977400cC2df63345",
+      "alpha": "0",
+      "alphaSamples": "0",
+      "shares": "200000000000000000000",
+      "tickLower": -2400,
+      "tickUpper": 2400,
+      "lastRebalanceTimestamp": 1795522785,
+      "envelope": {
+        "maxRangeWidth": 4800,
+        "maxCenterShift": 2400,
+        "maxTwapDistanceTicks": 4800,
+        "minRebalanceInterval": 600,
+        "maxPriceImpactBps": 1000,
+        "maxNavLossBps": -200,
+        "maxDailyNavLossBps": 1000
+      }
+    }
+  ],
+  "rebalances": [
+    {
+      "vault": "0x86fB893C2Dcb9EB5f16d8Fb641E827C610CA1f89",
+      "strategyId": 0,
+      "tickLower": -600,
+      "tickUpper": 600,
+      "liquidity": "3383749980973837142785",
+      "txHash": "0x63e84d2d5572beb4bb09d928b4998ff7cebd1d30b704322d4d0ba30b4f6a772c",
+      "blockNumber": 68669934,
+      "timestamp": 1795522746
+    },
+    {
+      "vault": "0xBFe8aD7DBF787bac8b49B85A922A641B85c33576",
+      "strategyId": 1,
+      "tickLower": -1200,
+      "tickUpper": 1200,
+      "liquidity": "1717249943619917122385",
+      "txHash": "0x0f77bbcc172e8aaac59d16a2586c6bdb93132c34425ade3f486ed7ebc593f5ef",
+      "blockNumber": 68669951,
+      "timestamp": 1795522763
+    },
+    {
+      "vault": "0xd9Ff3a77F9BD96D8De9E96ba977400cC2df63345",
+      "strategyId": 2,
+      "tickLower": -2400,
+      "tickUpper": 2400,
+      "liquidity": "884374709427154703939",
+      "txHash": "0xbf16a444653b043c35a15e895fa6618d553a2e7611ac8f8eec2af56709b4109d",
+      "blockNumber": 68669973,
+      "timestamp": 1795522785
+    }
+  ],
+  "oracle": {
+    "ready": false,
+    "samples": 16,
+    "lastTimestamp": 1795588446,
+    "lastTickCumulative": "-3504",
+    "maxAgeSeconds": 3600,
+    "paused": false
+  }
+}
