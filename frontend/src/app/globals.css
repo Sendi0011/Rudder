@@ -1,0 +1,190 @@
+@import "tailwindcss";
+
+@theme {
+  --color-paper: #eaeef2;
+  --color-ink: #14253a;
+  --color-slate: #5f7285;
+  --color-sea-glass: #bcd8d1;
+  --color-cobalt: #2c4bd6;
+  --color-signal: #d2392b;
+  --color-rule: #c5cfd7;
+  --font-heading: var(--font-display), "Bricolage Grotesque", sans-serif;
+  --font-body: var(--font-plex), "IBM Plex Sans", sans-serif;
+}
+
+:root {
+  color-scheme: light;
+  --paper-grid: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32'%3E%3Cpath d='M32 0H0V32' fill='none' stroke='%2314253A' stroke-opacity='.045' stroke-width='1'/%3E%3C/svg%3E");
+}
+
+html {
+  background: var(--color-paper);
+}
+
+body {
+  background-color: var(--color-paper);
+  background-image: var(--paper-grid);
+  color: var(--color-ink);
+  font-family: var(--font-body), "IBM Plex Sans", sans-serif;
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-heading), "Bricolage Grotesque", sans-serif;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  text-wrap: balance;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-cobalt);
+  outline-offset: 3px;
+}
+
+a {
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
+}
+
+::selection {
+  background: var(--color-sea-glass);
+  color: var(--color-ink);
+}
+
+.shell {
+  width: min(1200px, calc(100% - 2.5rem));
+  margin-inline: auto;
+}
+
+.page-lead {
+  font-size: clamp(2.4rem, 5.5vw, 4.6rem);
+  line-height: 1.02;
+  letter-spacing: -0.045em;
+  max-width: 22ch;
+}
+
+.eyebrow {
+  font-size: 0.72rem;
+  letter-spacing: 0.09em;
+  color: var(--color-slate);
+}
+
+.figure {
+  font-family: var(--font-heading), "Bricolage Grotesque", sans-serif;
+  font-size: clamp(2rem, 4vw, 3.4rem);
+  line-height: 1;
+  letter-spacing: -0.04em;
+}
+
+.hairline {
+  border-top: 1px solid var(--color-rule);
+}
+
+.muted {
+  color: var(--color-slate);
+}
+
+.action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 2.75rem;
+  padding: 0.6rem 1.15rem;
+  background: var(--color-cobalt);
+  color: #fff;
+  border: 1px solid var(--color-cobalt);
+  font-weight: 600;
+  line-height: 1.2;
+  cursor: pointer;
+}
+
+.action:hover:not(:disabled) {
+  background: var(--color-ink);
+  border-color: var(--color-ink);
+}
+
+.action:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.action-quiet {
+  background: transparent;
+  color: var(--color-ink);
+  border-color: var(--color-rule);
+}
+
+.action-quiet:hover:not(:disabled) {
+  background: var(--color-sea-glass);
+  color: var(--color-ink);
+  border-color: var(--color-slate);
+}
+
+.table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.data-table {
+  width: 100%;
+  min-width: 34rem;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 0.9rem;
+}
+
+.data-table th,
+.data-table td {
+  padding: 0.7rem 0.85rem;
+  border-bottom: 1px solid var(--color-rule);
+  vertical-align: top;
+}
+
+.data-table th {
+  font-weight: 600;
+  color: var(--color-slate);
+  font-size: 0.78rem;
+  letter-spacing: 0.03em;
+}
+
+.data-table tbody tr:hover {
+  background: rgb(188 216 209 / 0.3);
+}
+
+.status-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.5rem;
+  padding: 0.75rem 0;
+  border-top: 1px solid var(--color-rule);
+  border-bottom: 1px solid var(--color-rule);
+  font-size: 0.85rem;
+}
+
+.dot {
+  display: inline-block;
+  width: 0.55rem;
+  height: 0.55rem;
+  margin-right: 0.45rem;
+  border-radius: 50%;
+  background: var(--color-slate);
+}
+
+.dot-live {
+  background: var(--color-cobalt);
+}
+
+.dot-breach {
+  background: var(--color-signal);
+}
+
+@media (max-width: 640px) {
+  .shell {
+    width: calc(100% - 1.5rem);
+  }
+}
