@@ -80,15 +80,14 @@ export default function ProtocolPage() {
             </text>
           </svg>
         </div>
-        <ol className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {flow.map((step, index) => (
-            <li key={step.label} className="border-l-2 border-cobalt pl-3 text-sm">
-              <span className="text-slate">{index + 1}. </span>
+        <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {flow.map((step) => (
+            <div key={step.label} className="border-l-2 border-cobalt pl-3 text-sm">
               <strong>{step.label}</strong>
               <p className="mt-1 text-slate">{step.detail}</p>
-            </li>
+            </div>
           ))}
-        </ol>
+        </div>
       </section>
 
       <section className="mt-12" aria-labelledby="state-heading">

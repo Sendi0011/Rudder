@@ -67,4 +67,4 @@ that a plain `git status` in a vendored-v4 project is misleading until you inspe
 
 ---
 
-Rendered from commit b70d05cbe6a8f8d7013b018a41c0559c72ee1749 · [View source](https://github.com/Sendi0011/Rudder/blob/b70d05cbe6a8f8d7013b018a41c0559c72ee1749/docs/FEEDBACK.md)
+Rendered from commit cee9100a4c4fa976728806331a6177b82c568d6d · [View source](https://github.com/Sendi0011/Rudder/blob/cee9100a4c4fa976728806331a6177b82c568d6d/docs/FEEDBACK.md)

@@ -9,5 +9,11 @@ export function generateStaticParams() {
 
 export default async function Page({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  return <CuratorDetail id={Number(id)} />;
+  const entry = snapshot.curators.find((curator) => curator.id === Number(id));
+  return (
+    <>
+      <h1 className="sr-only">{entry ? `Curator ${entry.curator}` : `Strategy ${id}`}</h1>
+      <CuratorDetail id={Number(id)} />
+    </>
+  );
 }

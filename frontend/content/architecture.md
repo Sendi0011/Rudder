@@ -78,4 +78,4 @@ boundaries, and `adr/ADR-001-architecture.md`, `adr/ADR-002-oracle-and-rebalance
 
 ---
 
-Rendered from commit b70d05cbe6a8f8d7013b018a41c0559c72ee1749 · [View source](https://github.com/Sendi0011/Rudder/blob/b70d05cbe6a8f8d7013b018a41c0559c72ee1749/docs/ARCHITECTURE.md)
+Rendered from commit cee9100a4c4fa976728806331a6177b82c568d6d · [View source](https://github.com/Sendi0011/Rudder/blob/cee9100a4c4fa976728806331a6177b82c568d6d/docs/ARCHITECTURE.md)

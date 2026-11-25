@@ -22,4 +22,4 @@ tier, and observed single-rebalance losses sit below that level.
 
 ---
 
-Rendered from commit b70d05cbe6a8f8d7013b018a41c0559c72ee1749 · [View source](https://github.com/Sendi0011/Rudder/blob/b70d05cbe6a8f8d7013b018a41c0559c72ee1749/docs/adr/ADR-003-protocol-nav-loss-floor.md)
+Rendered from commit cee9100a4c4fa976728806331a6177b82c568d6d · [View source](https://github.com/Sendi0011/Rudder/blob/cee9100a4c4fa976728806331a6177b82c568d6d/docs/adr/ADR-003-protocol-nav-loss-floor.md)

@@ -73,8 +73,8 @@ export default function JudgePathPanel() {
         </div>
       ) : null}
 
-      <ol className="mt-10 grid gap-0">
-        <li className="border-t border-rule py-6">
+      <div className="mt-10 grid gap-0">
+        <div className="border-t border-rule py-6">
           <p className="eyebrow">Fund</p>
           <h2 className="mt-1 text-xl">Mint test tokens</h2>
           <p className="mt-2 max-w-2xl text-sm text-slate">
@@ -88,8 +88,8 @@ export default function JudgePathPanel() {
           >
             {busy ? "Mint…" : "Mint"}
           </button>
-        </li>
-        <li className="border-t border-rule py-6">
+        </div>
+        <div className="border-t border-rule py-6">
           <p className="eyebrow">Try</p>
           <h2 className="mt-1 text-xl">Deposit into a vault</h2>
           <p className="mt-2 max-w-2xl text-sm text-slate">
@@ -104,8 +104,8 @@ export default function JudgePathPanel() {
           >
             Deposit
           </button>
-        </li>
-        <li className="border-t border-rule py-6">
+        </div>
+        <div className="border-t border-rule py-6">
           <p className="eyebrow">Prove</p>
           <h2 className="mt-1 text-xl">Watch a rejected rebalance</h2>
           <p className="mt-2 max-w-2xl text-sm text-slate">
@@ -115,8 +115,8 @@ export default function JudgePathPanel() {
           <Link className="action action-quiet mt-4 inline-flex" href="/proof/">
             Simulate rebalance
           </Link>
-        </li>
-        <li className="border-b border-t border-rule py-6">
+        </div>
+        <div className="border-b border-t border-rule py-6">
           <p className="eyebrow">Exit</p>
           <h2 className="mt-1 text-xl">Withdraw and inspect</h2>
           <p className="mt-2 max-w-2xl text-sm text-slate">
@@ -135,8 +135,8 @@ export default function JudgePathPanel() {
               My positions
             </Link>
           </div>
-        </li>
-      </ol>
+        </div>
+      </div>
 
       {notice ? (
         <p className={`mt-6 text-sm ${notice.ok ? "text-ink" : "text-signal"}`} role="status">
