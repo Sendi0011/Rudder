@@ -1,4 +1,5 @@
 import Link from "next/link";
+import DocsNote from "@/components/DocsNote";
 import HomeCorridor from "@/components/HomeCorridor";
 import TryItPanel from "@/components/TryItPanel";
 
@@ -21,6 +22,7 @@ export default function HomePage() {
         </Link>
         .
       </p>
+      <DocsNote href="/docs/how-it-works/">The corridor, the envelope and the vault flow are described in</DocsNote>
     </div>
   );
 }

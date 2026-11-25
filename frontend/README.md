@@ -30,4 +30,5 @@ markdown or JSON and rerun the relevant script.
 
 Set `NEXT_PUBLIC_UNICHAIN_SEPOLIA_RPC_URL` to a read-only RPC endpoint for live reads and simulations.
 Without it the app uses a public endpoint when available and otherwise shows recorded snapshot data.
-Never put a private key in the frontend environment.
+Set `NEXT_PUBLIC_MIGRATOR_ADDRESS` only after verifying a deployed `VaultMigrator`; no migrator address
+is in the deployment record for chain 1301. Never put a private key in the frontend environment.

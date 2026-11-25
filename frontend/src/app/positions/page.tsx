@@ -1,3 +1,4 @@
+import DocsNote from "@/components/DocsNote";
 import PositionsPanel from "@/components/PositionsPanel";
 
 export const metadata = {
@@ -16,6 +17,7 @@ export default function PositionsPage() {
       <div className="mt-12 border-t border-rule pt-8">
         <PositionsPanel />
       </div>
+      <DocsNote href="/docs/architecture/">Vault shares, fees, permissions and migration are described in</DocsNote>
     </div>
   );
 }

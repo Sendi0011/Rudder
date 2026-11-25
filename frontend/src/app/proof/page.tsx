@@ -1,3 +1,4 @@
+import DocsNote from "@/components/DocsNote";
 import ProofPanel from "@/components/ProofPanel";
 
 export const metadata = {
@@ -16,6 +17,7 @@ export default function ProofPage() {
       <div className="mt-12">
         <ProofPanel />
       </div>
+      <DocsNote href="/docs/evidence/">The limits demonstrated by this simulation are documented in</DocsNote>
     </div>
   );
 }

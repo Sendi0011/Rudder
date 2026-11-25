@@ -1,4 +1,5 @@
 import ConsolePanel from "@/components/ConsolePanel";
+import DocsNote from "@/components/DocsNote";
 
 export const metadata = {
   title: "Curator console",
@@ -16,6 +17,7 @@ export default function ConsolePage() {
       <div className="mt-12">
         <ConsolePanel />
       </div>
+      <DocsNote href="/docs/architecture/">The envelope and rebalance flow are described in</DocsNote>
     </div>
   );
 }
