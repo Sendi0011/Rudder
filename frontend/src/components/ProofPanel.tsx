@@ -16,6 +16,14 @@ type Outcome = {
   raw?: string;
 };
 
+type DecodedRevert = {
+  name: string;
+};
+
+function isHexData(value: unknown): value is `0x${string}` {
+  return typeof value === "string" && /^0x[0-9a-fA-F]*$/.test(value);
+}
+
 const reasons: Record<string, string> = {
   RebalanceOutOfBounds: "The range is outside the published limits.",
   TickNotAligned: "The ticks do not align with the pool spacing.",
@@ -31,14 +39,31 @@ const reasons: Record<string, string> = {
   InvalidCenterShift: "The range center moved too far from the average price.",
 };
 
-function decodeRevert(data?: `0x${string}`) {
-  if (!data) return null;
-  try {
-    const decoded = decodeErrorResult({ abi: RudderVaultAbi, data });
-    return { name: decoded.errorName, args: decoded.args };
-  } catch {
-    return null;
+function decodeRevert(data: unknown): DecodedRevert | null {
+  if (isHexData(data)) {
+    try {
+      const decoded = decodeErrorResult({ abi: RudderVaultAbi, data });
+      return { name: decoded.errorName };
+    } catch {
+      return null;
+    }
   }
+  if (
+    typeof data === "object" &&
+    data !== null &&
+    "errorName" in data &&
+    typeof (data as { errorName?: unknown }).errorName === "string"
+  ) {
+    return { name: (data as { errorName: string }).errorName };
+  }
+  return null;
+}
+
+function revertLabel(data: unknown): string | undefined {
+  if (isHexData(data)) return data;
+  const decoded = decodeRevert(data);
+  if (decoded) return decoded.name;
+  return typeof data === "string" ? data : undefined;
 }
 
 export default function ProofPanel() {
@@ -79,9 +104,10 @@ export default function ProofPanel() {
         detail: "This call passed the live vault checks. Nothing was signed or broadcast.",
       });
     } catch (error) {
-      const cause = error as { data?: `0x${string}`; cause?: { data?: `0x${string}` } };
-      const raw = cause.cause?.data ?? cause.data;
-      const decoded = decodeRevert(raw);
+      const cause = error as { data?: unknown; cause?: { data?: unknown } };
+      const rawData = cause.cause?.data ?? cause.data;
+      const raw = revertLabel(rawData);
+      const decoded = decodeRevert(rawData);
       setOutcome({
         ok: false,
         title: decoded ? `Rejected by ${decoded.name}` : "Simulation rejected",
