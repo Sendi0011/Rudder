@@ -1,16 +1,24 @@
 import { expect, test } from "@playwright/test";
 
 const routes = [
-  { path: "/", heading: "Curators steer" },
-  { path: "/curators/", heading: "Curators, ordered by alpha alone." },
-  { path: "/curators/0/", heading: "Curator 0x" },
-  { path: "/positions/", heading: "Your position, your exit." },
-  { path: "/console/", heading: "Every move has a stated limit." },
-  { path: "/proof/", heading: "A rejected move" },
-  { path: "/evidence/", heading: "What we measured — and what we did not." },
-  { path: "/protocol/", heading: "One pool, one range, enforced twice." },
-  { path: "/try/", heading: "Fund, deposit, prove the guard, exit." },
+  { path: "/", heading: "Trust the rules, not the manager." },
+  { path: "/vaults/", heading: "Pick a curator." },
+  { path: "/vaults/0/", heading: "Curator 0x" },
+  { path: "/deposits/", heading: "Your deposits." },
+  { path: "/for-curators/", heading: "For curators." },
+  { path: "/proof/", heading: "Try to break the rules." },
+  { path: "/evidence/", heading: "What we measured." },
+  { path: "/contracts/", heading: "Contracts." },
+  { path: "/try/", heading: "Try it in two minutes." },
   { path: "/docs/", heading: "Documentation" },
+];
+
+const legacyRoutes = [
+  "/curators/",
+  "/curators/0/",
+  "/positions/",
+  "/console/",
+  "/protocol/",
 ];
 
 for (const route of routes) {
@@ -21,8 +29,16 @@ for (const route of routes) {
   });
 }
 
+test("legacy routes still render", async ({ page }) => {
+  for (const path of legacyRoutes) {
+    await page.goto(path);
+    await expect(page.locator("h1").first()).toBeVisible();
+    await expect(page.locator("footer")).toBeVisible();
+  }
+});
+
 test("no password inputs are rendered", async ({ page }) => {
-  for (const route of routes) {
+  for (const route of [...routes, ...legacyRoutes.map((path) => ({ path }))]) {
     await page.goto(route.path);
     expect(await page.locator('input[type="password"]').count()).toBe(0);
   }

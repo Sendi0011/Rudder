@@ -4,7 +4,7 @@ import * as Dialog from "@radix-ui/react-dialog";
 import * as Tabs from "@radix-ui/react-tabs";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { formatUnits, parseUnits, zeroAddress } from "viem";
+import { parseUnits, zeroAddress } from "viem";
 import {
   useAccount,
   usePublicClient,
@@ -15,7 +15,7 @@ import {
 import { RudderVaultAbi, TestERC20Abi } from "@/abis";
 import { addresses, explorerTx, shortAddress, unichainSepolia } from "@/lib/chain";
 import { useChainData } from "@/lib/chainData";
-import { formatCount } from "@/lib/format";
+import { formatCount, formatToken } from "@/lib/format";
 
 interface Props {
   open: boolean;
@@ -177,13 +177,13 @@ export default function ActionDrawer({ open, onOpenChange, defaultCuratorId = 0,
         <Dialog.Content className="fixed right-0 top-0 h-full w-full max-w-lg overflow-y-auto border-l border-rule bg-paper p-6 shadow-xl focus:outline-none sm:p-8">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <p className="eyebrow">Unichain Sepolia · browser wallet only</p>
+              <p className="text-sm text-slate">Browser wallet only</p>
               <Dialog.Title className="mt-1 text-2xl">Deposit or withdraw</Dialog.Title>
               <Dialog.Description className="mt-2 text-sm text-slate">
                 Your wallet signs every transaction. No key is requested, stored or sent to this app.
               </Dialog.Description>
             </div>
-            <Dialog.Close className="action action-quiet min-h-0 px-2 py-1 text-xs" aria-label="Close">
+            <Dialog.Close className="button-small button-secondary" aria-label="Close">
               Close
             </Dialog.Close>
           </div>
@@ -198,7 +198,7 @@ export default function ActionDrawer({ open, onOpenChange, defaultCuratorId = 0,
               <p>This wallet is on chain {chainId ?? "--"}. Switch to Unichain Sepolia.</p>
               <button
                 type="button"
-                className="action action-quiet mt-3"
+                className="button-secondary mt-3"
                 onClick={() => void switchChainAsync({ chainId: unichainSepolia.id }).catch(() => undefined)}
               >
                 Switch network
@@ -209,7 +209,7 @@ export default function ActionDrawer({ open, onOpenChange, defaultCuratorId = 0,
           <label className="mt-8 block text-sm">
             Strategy vault
             <select
-              className="mt-2 w-full border border-rule bg-paper px-3 py-2"
+              className="field mt-2 w-full"
               value={curator?.id ?? 0}
               onChange={(event) => setCuratorId(Number(event.target.value))}
               disabled={Boolean(busy)}
@@ -224,29 +224,29 @@ export default function ActionDrawer({ open, onOpenChange, defaultCuratorId = 0,
 
           {curator ? (
             <p className="mt-2 text-xs text-slate">
-              Limits: ±{formatCount(curator.envelope.maxTwapDistanceTicks)} ticks from the TWAP.
+              Limits: ±{formatCount(curator.envelope.maxTwapDistanceTicks)} ticks from the average price.
               Deposits and withdrawals always use these on-chain limits.
             </p>
           ) : null}
 
           <Tabs.Root value={tab} onValueChange={setTab} className="mt-8">
             <Tabs.List className="flex gap-2 border-b border-rule" aria-label="Action">
-              <Tabs.Trigger value="deposit" className="px-3 py-2 text-sm data-[state=active]:border-b-2 data-[state=active]:border-cobalt data-[state=active]:text-ink">
+              <Tabs.Trigger value="deposit" className="px-3 py-2 text-sm data-[state=active]:border-b-2 data-[state=active]:border-accent data-[state=active]:text-ink">
                 Deposit
               </Tabs.Trigger>
-              <Tabs.Trigger value="withdraw" className="px-3 py-2 text-sm data-[state=active]:border-b-2 data-[state=active]:border-cobalt data-[state=active]:text-ink">
+              <Tabs.Trigger value="withdraw" className="px-3 py-2 text-sm data-[state=active]:border-b-2 data-[state=active]:border-accent data-[state=active]:text-ink">
                 Withdraw
               </Tabs.Trigger>
             </Tabs.List>
             <Tabs.Content value="deposit" className="pt-6">
               <p className="mb-4 text-xs text-slate">
-                Token A balance: {balance0.data !== undefined ? formatUnits(balance0.data, 18) : "--"} · Token B balance:{" "}
-                {balance1.data !== undefined ? formatUnits(balance1.data, 18) : "--"}
+                Token A balance: {formatToken(balance0.data)} · Token B balance:{" "}
+                {formatToken(balance1.data)}
               </p>
               <label className="block text-sm">
                 Token A amount
                 <input
-                  className="mt-2 w-full border border-rule bg-paper px-3 py-2"
+                  className="field mt-2 w-full"
                   inputMode="decimal"
                   value={amount0}
                   onChange={(event) => setAmount0(event.target.value)}
@@ -257,7 +257,7 @@ export default function ActionDrawer({ open, onOpenChange, defaultCuratorId = 0,
               <label className="mt-4 block text-sm">
                 Token B amount
                 <input
-                  className="mt-2 w-full border border-rule bg-paper px-3 py-2"
+                  className="field mt-2 w-full"
                   inputMode="decimal"
                   value={amount1}
                   onChange={(event) => setAmount1(event.target.value)}
@@ -268,12 +268,12 @@ export default function ActionDrawer({ open, onOpenChange, defaultCuratorId = 0,
             </Tabs.Content>
             <Tabs.Content value="withdraw" className="pt-6">
               <p className="mb-4 text-xs text-slate">
-                Your shares: {shareBalance.data !== undefined ? formatUnits(shareBalance.data, 18) : "--"}
+                Your shares: {formatToken(shareBalance.data)}
               </p>
               <label className="block text-sm">
                 Shares to withdraw
                 <input
-                  className="mt-2 w-full border border-rule bg-paper px-3 py-2"
+                  className="field mt-2 w-full"
                   inputMode="decimal"
                   value={shares}
                   onChange={(event) => setShares(event.target.value)}
@@ -286,7 +286,7 @@ export default function ActionDrawer({ open, onOpenChange, defaultCuratorId = 0,
 
           <button
             type="button"
-            className="action mt-8 w-full"
+            className="button mt-8 w-full"
             disabled={!isConnected || wrongChain || Boolean(busy)}
             onClick={() => void submit()}
           >
@@ -294,7 +294,7 @@ export default function ActionDrawer({ open, onOpenChange, defaultCuratorId = 0,
           </button>
           {busy ? <p className="mt-3 text-sm text-slate">Waiting for your wallet and the chain…</p> : null}
           {result ? (
-            <p className={`mt-4 text-sm ${result.kind === "ok" ? "text-ink" : "text-signal"}`} role="status">
+            <p className={`mt-4 text-sm text-ink`} role="status">
               {result.text}{" "}
               {result.hash ? (
                 <Link className="underline" href={explorerTx(result.hash)} target="_blank" rel="noreferrer">

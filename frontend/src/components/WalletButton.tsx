@@ -1,8 +1,8 @@
 "use client";
 
 import { useAccount, useConnect, useDisconnect, useSwitchChain } from "wagmi";
-import { unichainSepolia } from "@/lib/chain";
 import { shortAddress } from "@/lib/chain";
+import { unichainSepolia } from "@/lib/chain";
 
 export default function WalletButton() {
   const { address, chainId, isConnected } = useAccount();
@@ -24,7 +24,7 @@ export default function WalletButton() {
     <div className="flex items-center gap-2">
       <button
         type="button"
-        className="action action-quiet min-h-0 px-3 py-1 text-xs"
+        className="button-secondary"
         disabled={isConnecting || isSwitching}
         onClick={() => {
           if (!isConnected) {
@@ -38,7 +38,7 @@ export default function WalletButton() {
         {label}
       </button>
       {isConnected ? (
-        <button type="button" className="text-xs text-slate underline" onClick={() => disconnect()}>
+        <button type="button" className="button-secondary" onClick={() => disconnect()}>
           Disconnect
         </button>
       ) : null}

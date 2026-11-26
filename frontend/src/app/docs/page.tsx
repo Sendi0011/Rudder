@@ -10,7 +10,7 @@ export default function DocsIndexPage() {
   if (!doc) return null;
   return (
     <div className="pt-12 sm:pt-16">
-      <h1 className="page-lead mt-5">Documentation</h1>
+      <h1 className="page-title">Documentation</h1>
       <div className="mt-10">
         <DocsShell doc={doc} />
       </div>

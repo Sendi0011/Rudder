@@ -38,6 +38,9 @@ function tocOf(markdown: string) {
 }
 
 const components: Components = {
+  h1({ children }) {
+    return <h2>{children}</h2>;
+  },
   h2({ children }) {
     return <h2 id={slugify(textOf(children))}>{children}</h2>;
   },
@@ -79,7 +82,7 @@ export default function DocsShell({ doc }: { doc: Doc }) {
       <nav aria-label="Documentation" className="text-sm">
         {groupOrder.map((group) => (
           <div key={group} className="mb-6">
-            <p className="eyebrow">{group}</p>
+            <p className="text-sm font-semibold">{group}</p>
             <ul className="mt-2 space-y-1">
               {manifest
                 .filter((entry) => entry.group === group)
@@ -99,13 +102,12 @@ export default function DocsShell({ doc }: { doc: Doc }) {
         ))}
       </nav>
       <article className="docs-prose min-w-0">
-        <p className="eyebrow">Docs · {doc.group}</p>
         <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight]} components={components}>
           {markdown}
         </ReactMarkdown>
       </article>
       <aside aria-labelledby="toc-heading" className="hidden lg:block">
-        <p id="toc-heading" className="eyebrow">
+        <p id="toc-heading" className="text-sm font-semibold">
           On this page
         </p>
         {toc.length ? (

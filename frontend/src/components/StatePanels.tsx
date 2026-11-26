@@ -13,23 +13,11 @@ export function ChainStatus({
   fallbackReason?: string;
 }) {
   return (
-    <span className="inline-flex flex-wrap items-center gap-2 text-xs text-slate">
-      <span className={`dot ${source === "live" ? "dot-live" : ""}`} aria-hidden="true" />
+    <span className="text-xs text-slate">
       {source === "live" ? "Live reads" : "Recorded snapshot"}
       {recordedAt && source === "snapshot" ? ` · ${recordedAt}` : ""}
       {fallbackReason ? ` · ${fallbackReason}` : ""}
     </span>
-  );
-}
-
-export function LoadingPanel({ label = "Reading the contracts" }: { label?: string }) {
-  return (
-    <div className="py-10" role="status" aria-live="polite">
-      <div className="h-px w-full bg-rule">
-        <div className="h-px w-1/3 bg-cobalt" />
-      </div>
-      <p className="mt-4 text-sm text-slate">{label}…</p>
-    </div>
   );
 }
 
@@ -44,11 +32,11 @@ export function EmptyPanel({ message, action }: { message: string; action?: Reac
 
 export function ErrorPanel({ message, onRetry }: { message: string; onRetry?: () => void }) {
   return (
-    <div className="border-y border-signal py-8" role="alert">
-      <p className="font-heading text-lg">Read failed</p>
+    <div className="error" role="alert">
+      <p className="font-semibold">Read failed</p>
       <p className="mt-1 text-sm text-slate">{message}</p>
       {onRetry ? (
-        <button className="action action-quiet mt-4" type="button" onClick={onRetry}>
+        <button className="button-secondary mt-4" type="button" onClick={onRetry}>
           Retry read
         </button>
       ) : null}

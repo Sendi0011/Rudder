@@ -19,7 +19,7 @@ export default async function DocsPage({ params }: { params: Promise<{ slug: str
   if (!doc) notFound();
   return (
     <div className="pt-12 sm:pt-16">
-      <h1 className="page-lead mt-5">{doc.title}</h1>
+      <h1 className="page-title">{doc.title}</h1>
       <div className="mt-10">
         <DocsShell doc={doc} />
       </div>
