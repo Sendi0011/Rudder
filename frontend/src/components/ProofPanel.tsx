@@ -5,9 +5,9 @@ import { decodeErrorResult } from "viem";
 import { usePublicClient } from "wagmi";
 import { RudderVaultAbi } from "@/abis";
 import { CHAIN_ID, explorerAddress, shortAddress, unichainSepolia } from "@/lib/chain";
+import { ChainStatus, EmptyPanel, ErrorPanel } from "@/components/StatePanels";
 import { useChainData } from "@/lib/chainData";
 import { formatCount } from "@/lib/format";
-import { ChainStatus, EmptyPanel, ErrorPanel, LoadingPanel } from "@/components/StatePanels";
 
 type Outcome = {
   ok: boolean;
@@ -17,18 +17,18 @@ type Outcome = {
 };
 
 const reasons: Record<string, string> = {
-  RebalanceOutOfBounds: "The range is outside the published envelope.",
+  RebalanceOutOfBounds: "The range is outside the published limits.",
   TickNotAligned: "The ticks do not align with the pool spacing.",
   IntervalTooShort: "The rebalance came too soon after the last one.",
-  SpotTwapDeviation: "The spot price moved too far from the TWAP.",
+  SpotTwapDeviation: "The spot price moved too far from the average price.",
   PriceImpactTooHigh: "The price impact is above the published limit.",
-  NavLossTooLarge: "The NAV loss is above the published limit.",
-  DailyNavLossBudgetExceeded: "The daily NAV loss budget is exhausted.",
-  OracleBad: "The oracle data is stale or missing.",
+  NavLossTooLarge: "The net asset value loss is above the published limit.",
+  DailyNavLossBudgetExceeded: "The daily loss budget is exhausted.",
+  OracleBad: "The price feed data is stale or missing.",
   NotCurator: "Only the assigned curator may rebalance.",
   Paused: "The vault is paused.",
   InvalidRangeWidth: "The range is wider than the published limit.",
-  InvalidCenterShift: "The range center moved too far from the TWAP.",
+  InvalidCenterShift: "The range center moved too far from the average price.",
 };
 
 function decodeRevert(data?: `0x${string}`) {
@@ -42,7 +42,7 @@ function decodeRevert(data?: `0x${string}`) {
 }
 
 export default function ProofPanel() {
-  const { data, isLoading, isError, refetch } = useChainData();
+  const { data, isError, refetch } = useChainData();
   const publicClient = usePublicClient({ chainId: unichainSepolia.id });
   const [id, setId] = useState(0);
   const [lower, setLower] = useState("0");
@@ -101,17 +101,15 @@ export default function ProofPanel() {
     <section>
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="eyebrow">eth_call · chain {CHAIN_ID}</p>
-          <h2 className="mt-2 text-2xl">Live proof</h2>
+          <p className="text-sm text-slate">Read-only call · chain {CHAIN_ID}</p>
+          <h2 className="mt-2 text-2xl">Simulation</h2>
         </div>
         <ChainStatus {...data} />
       </div>
       <p className="mt-6 max-w-2xl text-slate">
-        This page simulates a curator rebalance against the deployed vault. It uses the public RPC and
-        the published curator address. No wallet is connected, no key is requested, and no transaction
-        is signed or sent.
+        This page simulates a curator rebalance against the deployed vault. No wallet is connected, no
+        key is requested, and no transaction is signed or sent.
       </p>
-      {isLoading ? <LoadingPanel label="Reading the live vault list" /> : null}
       {isError ? <ErrorPanel message="The live read failed." onRetry={() => void refetch()} /> : null}
       {!curator ? <EmptyPanel message="No strategies are registered." /> : null}
       {curator ? (
@@ -120,7 +118,7 @@ export default function ProofPanel() {
             <label className="block text-sm">
               Strategy
               <select
-                className="mt-2 w-full max-w-md border border-rule bg-paper px-3 py-2"
+                className="field mt-2 w-full max-w-md"
                 value={curator.id}
                 onChange={(event) => setId(Number(event.target.value))}
                 disabled={busy}
@@ -136,7 +134,7 @@ export default function ProofPanel() {
               <label className="text-sm">
                 New lower tick
                 <input
-                  className="mt-2 w-40 border border-rule bg-paper px-3 py-2"
+                  className="field mt-2 w-40"
                   type="number"
                   value={lower}
                   onChange={(event) => setLower(event.target.value)}
@@ -146,7 +144,7 @@ export default function ProofPanel() {
               <label className="text-sm">
                 New upper tick
                 <input
-                  className="mt-2 w-40 border border-rule bg-paper px-3 py-2"
+                  className="field mt-2 w-40"
                   type="number"
                   value={upper}
                   onChange={(event) => setUpper(event.target.value)}
@@ -154,7 +152,7 @@ export default function ProofPanel() {
                 />
               </label>
               <div className="flex items-end">
-                <button type="button" className="action" disabled={busy} onClick={() => void simulate()}>
+                <button type="button" className="button" disabled={busy} onClick={() => void simulate()}>
                   {busy ? "Simulating…" : "Simulate rebalance"}
                 </button>
               </div>
@@ -174,23 +172,20 @@ export default function ProofPanel() {
               <dd className="break-all">{curator.curator}</dd>
             </div>
             <div>
-              <dt className="text-slate">TWAP tick</dt>
-              <dd>{formatCount(twap)}</dd>
+              <dt className="text-slate">Average price tick</dt>
+              <dd className="numeric">{formatCount(twap)}</dd>
             </div>
             <div>
-              <dt className="text-slate">Published TWAP-distance limit</dt>
-              <dd>±{formatCount(curator.envelope.maxTwapDistanceTicks)} ticks</dd>
+              <dt className="text-slate">Published distance limit</dt>
+              <dd className="numeric">±{formatCount(curator.envelope.maxTwapDistanceTicks)} ticks</dd>
             </div>
           </dl>
           {outcome ? (
-            <div
-              className={`mt-8 border-l-4 py-4 pl-4 ${outcome.ok ? "border-sea-glass" : "border-signal"}`}
-              role="status"
-            >
-              <p className="font-heading text-lg">{outcome.title}</p>
+            <div className={`${outcome.ok ? "panel" : "error"} mt-8`} role="status">
+              <p className="font-semibold">{outcome.title}</p>
               <p className="mt-1 text-sm text-slate">{outcome.detail}</p>
               {outcome.raw ? (
-                <p className="mt-2 break-all text-xs text-slate">Revert data: {outcome.raw}</p>
+                <p className="numeric mt-2 break-all text-xs text-slate">Revert data: {outcome.raw}</p>
               ) : null}
             </div>
           ) : null}

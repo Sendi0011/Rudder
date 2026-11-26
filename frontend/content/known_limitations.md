@@ -35,7 +35,7 @@ each item is either an accepted design trade-off or work that is not yet done.
 - **The daily budget prices rebalance loss only.** The bucket charges TWAP-measured NAV loss from a
   rebalance; it does not cap market-price moves, fee opportunity cost or rounding in favor of LPs.
   The seeded budgets and observed charged loss are in
-  [`evidence/worst_case_loss.json`](https://github.com/Sendi0011/Rudder/raw/5b32e45ae598940f532367a3840275bf257be677/evidence/worst_case_loss.json).
+  [`evidence/worst_case_loss.json`](https://github.com/Sendi0011/Rudder/raw/e2136aea016f055a33d630b075eedb1cc6db4667/evidence/worst_case_loss.json).
 - **Tightening can leave the bucket above capacity.** A smaller budget lowers capacity immediately and
   does not clamp the stored charge, so rebalances stay blocked until time refills enough room. The
   choice is recorded in [`ADR-004`](/docs/adr/adr-004-daily-loss-budget/).
@@ -63,7 +63,7 @@ each item is either an accepted design trade-off or work that is not yet done.
   registry never turns a withdrawal into a revert.
 - **Rebalance loss has a spendable daily allowance.** A leaky bucket in `RudderVault` caps the
   cumulative charge and refills continuously; the source mutants in
-  [`evidence/mutation.md`](https://github.com/Sendi0011/Rudder/blob/5b32e45ae598940f532367a3840275bf257be677/evidence/mutation.md) cover the capacity, refill, rounding and
+  [`evidence/mutation.md`](https://github.com/Sendi0011/Rudder/blob/e2136aea016f055a33d630b075eedb1cc6db4667/evidence/mutation.md) cover the capacity, refill, rounding and
   validation checks.
 
 ## Not yet done
@@ -91,4 +91,4 @@ each item is either an accepted design trade-off or work that is not yet done.
 
 ---
 
-Rendered from commit 5b32e45ae598940f532367a3840275bf257be677 · [View source](https://github.com/Sendi0011/Rudder/blob/5b32e45ae598940f532367a3840275bf257be677/docs/KNOWN_LIMITATIONS.md)
+Rendered from commit e2136aea016f055a33d630b075eedb1cc6db4667 · [View source](https://github.com/Sendi0011/Rudder/blob/e2136aea016f055a33d630b075eedb1cc6db4667/docs/KNOWN_LIMITATIONS.md)

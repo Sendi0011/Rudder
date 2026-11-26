@@ -190,7 +190,6 @@ export function useChainData() {
 
   return {
     data: query.data ?? snapshot,
-    isLoading: Boolean(client) && query.isPending,
     isError: query.isError,
     refetch: query.refetch,
   };

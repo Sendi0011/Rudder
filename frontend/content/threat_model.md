@@ -46,4 +46,4 @@ are claimed. We do not report tooling findings we did not run.
 
 ---
 
-Rendered from commit 5b32e45ae598940f532367a3840275bf257be677 · [View source](https://github.com/Sendi0011/Rudder/blob/5b32e45ae598940f532367a3840275bf257be677/docs/THREAT_MODEL.md)
+Rendered from commit e2136aea016f055a33d630b075eedb1cc6db4667 · [View source](https://github.com/Sendi0011/Rudder/blob/e2136aea016f055a33d630b075eedb1cc6db4667/docs/THREAT_MODEL.md)

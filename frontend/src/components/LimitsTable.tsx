@@ -18,10 +18,10 @@ function Used({ value, limit, suffix = "", note }: { value: number | null; limit
   return (
     <div>
       <span className="whitespace-nowrap">
-        {formatSigned(value, "")}{suffix} · {share}% of bound
+        {formatSigned(value, "")}{suffix} · {share}% of limit
       </span>
       <span className="mt-1 block h-1 w-24 bg-rule" aria-hidden="true">
-        <span className="block h-1 bg-cobalt" style={{ width: `${share}%` }} />
+        <span className="block h-1 bg-accent" style={{ width: `${share}%` }} />
       </span>
       {note ? <span className="mt-1 block text-xs text-slate">{note}</span> : null}
     </div>
@@ -43,11 +43,15 @@ export default function LimitsTable({ envelope, usage }: { envelope: Envelope; u
         </Link>
       </div>
       <p className="mt-2 max-w-2xl text-sm text-slate">
-        The envelope is stored on-chain in the registry. The used column reads rebalance event logs;
-        fields the events do not carry are marked as such.
+        The limits are stored on-chain in the registry. The used column reads rebalance event logs;
+        fields the events do not carry are marked as such. TWAP means time-weighted average price,
+        and NAV loss is the measured cost of a rebalance versus holding.
       </p>
-      <div className="table-scroll mt-5">
-        <table className="data-table">
+      <div className="table-wrap mt-5">
+        <table>
+          <caption>
+            Bound is the published maximum. Used shows the last recorded move against that maximum.
+          </caption>
           <thead>
             <tr>
               <th scope="col">Bound</th>
@@ -57,44 +61,44 @@ export default function LimitsTable({ envelope, usage }: { envelope: Envelope; u
           </thead>
           <tbody>
             <tr>
-              <th scope="row" className="text-left font-normal text-ink">Range width</th>
+              <th scope="row" className="font-normal">Range width</th>
               <td>{formatCount(envelope.maxRangeWidth)} ticks</td>
               <td><Used value={usage.width} limit={envelope.maxRangeWidth} suffix=" ticks" /></td>
             </tr>
             <tr>
-              <th scope="row" className="text-left font-normal text-ink">Centre shift</th>
+              <th scope="row" className="font-normal">Centre shift</th>
               <td>{formatCount(envelope.maxCenterShift)} ticks</td>
               <td><Used value={usage.centerShift} limit={envelope.maxCenterShift} suffix=" ticks" /></td>
             </tr>
             <tr>
-              <th scope="row" className="text-left font-normal text-ink">Rebalance interval</th>
+              <th scope="row" className="font-normal">Rebalance interval</th>
               <td>{formatCount(envelope.minRebalanceInterval)} s minimum</td>
               <td><Used value={usage.intervalSeconds} limit={envelope.minRebalanceInterval} suffix=" s" /></td>
             </tr>
             <tr>
-              <th scope="row" className="text-left font-normal text-ink">TWAP distance</th>
+              <th scope="row" className="font-normal">TWAP distance</th>
               <td>{formatCount(envelope.maxTwapDistanceTicks)} ticks</td>
               <td>
                 <Used
                   value={usage.twapDistance}
                   limit={envelope.maxTwapDistanceTicks}
                   suffix=" ticks"
-                  note="Current distance from the range centre to the TWAP tick"
+                  note="Distance from the range centre to the time-weighted average price tick"
                 />
               </td>
             </tr>
             <tr>
-              <th scope="row" className="text-left font-normal text-ink">Price impact</th>
+              <th scope="row" className="font-normal">Price impact</th>
               <td>{formatBps(envelope.maxPriceImpactBps, 0)}</td>
               <td><Used value={usage.priceImpact} limit={envelope.maxPriceImpactBps} suffix=" bps" /></td>
             </tr>
             <tr>
-              <th scope="row" className="text-left font-normal text-ink">NAV-loss floor</th>
+              <th scope="row" className="font-normal">NAV-loss floor</th>
               <td>{formatBps(envelope.maxNavLossBps, 0)}</td>
               <td><Used value={usage.navLoss} limit={Math.abs(envelope.maxNavLossBps)} suffix=" bps" /></td>
             </tr>
             <tr>
-              <th scope="row" className="text-left font-normal text-ink">Daily NAV-loss budget</th>
+              <th scope="row" className="font-normal">Daily NAV-loss budget</th>
               <td>{formatBps(envelope.maxDailyNavLossBps, 0)}</td>
               <td>
                 {bucketUsed === null ? (

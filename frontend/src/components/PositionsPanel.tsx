@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { formatUnits, zeroAddress } from "viem";
+import { zeroAddress } from "viem";
 import {
   useAccount,
   usePublicClient,
@@ -12,9 +12,9 @@ import {
 } from "wagmi";
 import { RudderVaultAbi, VaultMigratorAbi } from "@/abis";
 import { CHAIN_ID, explorerTx, migratorAddress, shortAddress, unichainSepolia } from "@/lib/chain";
+import { ChainStatus, EmptyPanel, ErrorPanel } from "@/components/StatePanels";
 import { useChainData } from "@/lib/chainData";
-import { formatCount } from "@/lib/format";
-import { ChainStatus, EmptyPanel, ErrorPanel, LoadingPanel } from "@/components/StatePanels";
+import { formatCount, formatToken } from "@/lib/format";
 import type { Curator } from "@/lib/types";
 
 type Notice = { kind: "ok" | "error"; text: string; hash?: string };
@@ -115,15 +115,15 @@ function PositionRow({ curator, options, owner, wrongChain }: RowProps) {
   return (
     <tr>
       <td>
-        <Link className="text-ink underline" href={`/curators/${curator.id}/`}>
+        <Link className="text-ink underline" href={`/vaults/${curator.id}/`}>
           Strategy {curator.id}
         </Link>
         <p className="mt-1 text-xs text-slate">{shortAddress(vault)}</p>
       </td>
-      <td>{shares.data !== undefined ? formatUnits(shares.data, 18) : "--"}</td>
-      <td>
+      <td className="numeric">{formatToken(shares.data)}</td>
+      <td className="numeric">
         {fees0.data !== undefined && fees1.data !== undefined
-          ? `${formatUnits(fees0.data, 18)} / ${formatUnits(fees1.data, 18)}`
+          ? `${formatToken(fees0.data)} / ${formatToken(fees1.data)}`
           : "--"}
       </td>
       <td>{!migrator ? "Contract not deployed" : allowed ? "Approved" : "Approve needed"}</td>
@@ -131,14 +131,14 @@ function PositionRow({ curator, options, owner, wrongChain }: RowProps) {
         <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
-            className="action action-quiet min-h-0 px-2 py-1 text-xs"
+            className="button-secondary button-small"
             disabled={!hasFees || wrongChain || Boolean(busy)}
             onClick={() => void claim()}
           >
             {busy === "Claim fees" ? "Claim fees…" : "Claim fees"}
           </button>
           <select
-            className="border border-rule bg-paper px-2 py-1 text-xs"
+            className="field field-small"
             aria-label={`Migrate strategy ${curator.id} destination`}
             value={destination}
             onChange={(event) => setDestination(event.target.value)}
@@ -155,7 +155,7 @@ function PositionRow({ curator, options, owner, wrongChain }: RowProps) {
           </select>
           <button
             type="button"
-            className="action min-h-0 px-2 py-1 text-xs"
+            className="button button-small"
             disabled={!hasPosition || !migrator || !destination || wrongChain || Boolean(busy)}
             onClick={() => void migrate()}
           >
@@ -163,7 +163,7 @@ function PositionRow({ curator, options, owner, wrongChain }: RowProps) {
           </button>
         </div>
         {notice ? (
-          <p className={`mt-2 text-xs ${notice.kind === "ok" ? "text-ink" : "text-signal"}`} role="status">
+          <p className="mt-2 text-xs text-ink" role="status">
             {notice.text}{" "}
             {notice.hash ? (
               <Link className="underline" href={explorerTx(notice.hash)} target="_blank" rel="noreferrer">
@@ -178,7 +178,7 @@ function PositionRow({ curator, options, owner, wrongChain }: RowProps) {
 }
 
 export default function PositionsPanel() {
-  const { data, isLoading, isError, refetch } = useChainData();
+  const { data, isError, refetch } = useChainData();
   const { address, isConnected, chainId } = useAccount();
   const { switchChainAsync } = useSwitchChain();
   const wrongChain = isConnected && chainId !== unichainSepolia.id;
@@ -188,12 +188,11 @@ export default function PositionsPanel() {
     <section>
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="eyebrow">Connected wallet</p>
-          <h2 className="mt-2 text-2xl">My positions</h2>
+          <p className="text-sm text-slate">Connected wallet</p>
+          <h2 className="mt-2 text-2xl">Vault shares</h2>
         </div>
         <ChainStatus {...data} />
       </div>
-      {isLoading ? <LoadingPanel label="Reading positions" /> : null}
       {isError ? <ErrorPanel message="Positions could not be read." onRetry={() => void refetch()} /> : null}
       {!isConnected ? (
         <EmptyPanel message="Connect a wallet from the header to see shares, fees and permissions." />
@@ -203,7 +202,7 @@ export default function PositionsPanel() {
           <p>Switch to Unichain Sepolia to read and change positions.</p>
           <button
             type="button"
-            className="action action-quiet mt-3"
+            className="button-secondary mt-3"
             onClick={() => void switchChainAsync({ chainId: unichainSepolia.id }).catch(() => undefined)}
           >
             Switch network
@@ -211,9 +210,11 @@ export default function PositionsPanel() {
         </div>
       ) : null}
       {isConnected && !wrongChain && address ? (
-        <div className="table-scroll mt-8">
-          <table className="data-table">
-            <caption className="sr-only">Vault shares, unclaimed fees and migration permissions</caption>
+        <div className="table-wrap mt-8">
+          <table>
+            <caption>
+              Shares are your vault balance. Permission shows whether the migrator may move the full position.
+            </caption>
             <thead>
               <tr>
                 <th scope="col">Vault</th>

@@ -65,7 +65,7 @@ export default function JudgePathPanel() {
           <p>Switch to Unichain Sepolia before minting or depositing.</p>
           <button
             type="button"
-            className="action action-quiet mt-3"
+            className="button-secondary mt-3"
             onClick={() => void switchChainAsync({ chainId: unichainSepolia.id }).catch(() => undefined)}
           >
             Switch network
@@ -75,14 +75,14 @@ export default function JudgePathPanel() {
 
       <div className="mt-10 grid gap-0">
         <div className="border-t border-rule py-6">
-          <p className="eyebrow">Fund</p>
-          <h2 className="mt-1 text-xl">Mint test tokens</h2>
+          <h2 className="text-lg font-semibold">Fund</h2>
+          <h3 className="mt-1 text-xl">Mint test tokens</h3>
           <p className="mt-2 max-w-2xl text-sm text-slate">
             The test tokens are on Unichain Sepolia and have no value. Your wallet signs two mint calls.
           </p>
           <button
             type="button"
-            className="action mt-4"
+            className="button mt-4"
             disabled={!isConnected || wrongChain || busy}
             onClick={() => void mint()}
           >
@@ -90,15 +90,15 @@ export default function JudgePathPanel() {
           </button>
         </div>
         <div className="border-t border-rule py-6">
-          <p className="eyebrow">Try</p>
-          <h2 className="mt-1 text-xl">Deposit into a vault</h2>
+          <h2 className="text-lg font-semibold">Try</h2>
+          <h3 className="mt-1 text-xl">Deposit into a vault</h3>
           <p className="mt-2 max-w-2xl text-sm text-slate">
             Approve each token if needed, then deposit into strategy 0. The same drawer can withdraw
             your shares later.
           </p>
           <button
             type="button"
-            className="action mt-4"
+            className="button mt-4"
             disabled={!isConnected || wrongChain}
             onClick={() => setDepositOpen(true)}
           >
@@ -106,40 +106,40 @@ export default function JudgePathPanel() {
           </button>
         </div>
         <div className="border-t border-rule py-6">
-          <p className="eyebrow">Prove</p>
-          <h2 className="mt-1 text-xl">Watch a rejected rebalance</h2>
+          <h2 className="text-lg font-semibold">Prove</h2>
+          <h3 className="mt-1 text-xl">Watch a rejected rebalance</h3>
           <p className="mt-2 max-w-2xl text-sm text-slate">
             A live simulation calls the deployed vault as the curator, with a range deliberately outside
-            the envelope. Nothing is signed or broadcast.
+            the published limits. Nothing is signed or broadcast.
           </p>
-          <Link className="action action-quiet mt-4 inline-flex" href="/proof/">
+          <Link className="button-secondary mt-4 inline-flex" href="/proof/">
             Simulate rebalance
           </Link>
         </div>
         <div className="border-b border-t border-rule py-6">
-          <p className="eyebrow">Exit</p>
-          <h2 className="mt-1 text-xl">Withdraw and inspect</h2>
+          <h2 className="text-lg font-semibold">Exit</h2>
+          <h3 className="mt-1 text-xl">Withdraw and inspect</h3>
           <p className="mt-2 max-w-2xl text-sm text-slate">
-            Withdraw shares or open your positions to see unclaimed fees and migration permission.
+            Withdraw shares or open your deposits to see unclaimed fees and migration permission.
           </p>
           <div className="mt-4 flex flex-wrap gap-3">
             <button
               type="button"
-              className="action"
+              className="button"
               disabled={!isConnected || wrongChain}
               onClick={() => setWithdrawOpen(true)}
             >
               Withdraw
             </button>
-            <Link className="action action-quiet inline-flex" href="/positions/">
-              My positions
+            <Link className="button-secondary inline-flex" href="/deposits/">
+              Your deposits
             </Link>
           </div>
         </div>
       </div>
 
       {notice ? (
-        <p className={`mt-6 text-sm ${notice.ok ? "text-ink" : "text-signal"}`} role="status">
+        <p className="mt-6 text-sm text-ink" role="status">
           {notice.text}{" "}
           {notice.hash ? (
             <Link className="underline" href={explorerTx(notice.hash)} target="_blank" rel="noreferrer">
@@ -150,8 +150,7 @@ export default function JudgePathPanel() {
       ) : null}
 
       <div className="mt-12 border-t border-rule pt-6">
-        <p className="eyebrow">Snapshot fallback</p>
-        <h2 className="mt-1 text-xl">Recorded chain state</h2>
+        <h2 className="text-xl">Recorded chain state</h2>
         <p className="mt-2 max-w-2xl text-sm text-slate">
           If a read fails, the app shows this recorded state instead of invented numbers. It was
           captured at {snapshot.recordedAt} from a read-only RPC.
@@ -163,14 +162,14 @@ export default function JudgePathPanel() {
           </div>
           <div>
             <dt className="text-slate">Strategies</dt>
-            <dd>{formatCount(snapshot.curators.length)}</dd>
+            <dd className="numeric">{formatCount(snapshot.curators.length)}</dd>
           </div>
           <div>
             <dt className="text-slate">Rebalances</dt>
-            <dd>{formatCount(snapshot.rebalances.length)}</dd>
+            <dd className="numeric">{formatCount(snapshot.rebalances.length)}</dd>
           </div>
           <div>
-            <dt className="text-slate">Oracle</dt>
+            <dt className="text-slate">Price feed</dt>
             <dd>{snapshot.oracle.ready ? "Ready" : "Not ready"} · {formatCount(snapshot.oracle.samples)} samples</dd>
           </div>
           <div>
@@ -178,8 +177,8 @@ export default function JudgePathPanel() {
             <dd>{shortAddress(snapshot.curators[0]?.curator)}</dd>
           </div>
           <div>
-            <dt className="text-slate">TWAP</dt>
-            <dd>{snapshot.twap[0]?.tick ?? "--"} ticks</dd>
+            <dt className="text-slate">Average price</dt>
+            <dd className="numeric">{snapshot.twap[0]?.tick ?? "--"} ticks</dd>
           </div>
         </dl>
       </div>

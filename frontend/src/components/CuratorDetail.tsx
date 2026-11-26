@@ -3,24 +3,23 @@
 import Link from "next/link";
 import CorridorChart from "@/components/CorridorChart";
 import LimitsTable, { type LimitUsage } from "@/components/LimitsTable";
-import { ChainStatus, EmptyPanel, LoadingPanel } from "@/components/StatePanels";
-import { useChainData } from "@/lib/chainData";
+import { ChainStatus, EmptyPanel } from "@/components/StatePanels";
 import { explorerTx, shortAddress } from "@/lib/chain";
+import { useChainData } from "@/lib/chainData";
 import { formatCount, formatSigned, formatToken } from "@/lib/format";
 import { useVaultDetails } from "@/lib/vaultData";
 
 export default function CuratorDetail({ id }: { id: number }) {
-  const { data, isLoading } = useChainData();
+  const { data } = useChainData();
   const curator = data.curators.find((entry) => entry.id === id);
   const vaultDetails = useVaultDetails(curator?.vault);
 
-  if (isLoading) return <div className="pt-16"><LoadingPanel label="Reading the strategy" /></div>;
   if (!curator) {
     return (
       <div className="pt-16">
         <EmptyPanel
           message="That strategy is not registered."
-          action={<Link className="action action-quiet" href="/curators/">Back to curators</Link>}
+          action={<Link className="button-secondary" href="/vaults/">Back to vaults</Link>}
         />
       </div>
     );
@@ -47,29 +46,29 @@ export default function CuratorDetail({ id }: { id: number }) {
 
   return (
     <div className="pt-12 sm:pt-16">
-      <Link className="text-sm text-slate underline" href="/curators/">All curators</Link>
+      <Link className="text-sm text-slate underline" href="/vaults/">All vaults</Link>
       <div className="mt-6 flex flex-wrap items-end justify-between gap-8">
         <div>
-          <p className="eyebrow">Strategy {curator.id}</p>
-          <h1 className="mt-3 text-4xl sm:text-5xl">Curator {shortAddress(curator.curator)}</h1>
+          <p className="text-sm text-slate">Strategy {curator.id}</p>
+          <h1 className="page-title mt-3">Curator {shortAddress(curator.curator)}</h1>
           <p className="mt-3 text-sm text-slate">
             Vault <span className="whitespace-nowrap">{shortAddress(curator.vault)}</span> · range{" "}
             {curator.tickLower} to {curator.tickUpper}
           </p>
         </div>
-        <div className="min-w-12rem">
-          <p className="eyebrow">On-chain alpha vs hold</p>
-          <p className="figure mt-2">{formatCount(curator.alpha)}</p>
+        <div className="w-44">
+          <p className="text-sm text-slate">Return vs holding</p>
+          <p className="numeric mt-2 text-3xl">{formatCount(curator.alpha)}</p>
           <p className="mt-2 text-xs text-slate">
             {formatCount(curator.alphaSamples)} checkpoints · dimensionless, not a profit figure
           </p>
         </div>
       </div>
 
-      <div className="status-strip mt-10">
+      <div className="mt-10 flex flex-wrap gap-x-6 gap-y-2 text-sm text-slate">
         <ChainStatus {...data} />
         <span>Last rebalance: {last ? `${last.tickLower} to ${last.tickUpper}` : "none recorded"}</span>
-        <span>TWAP tick: {formatCount(twapTick)}</span>
+        <span>Time-weighted average price tick: {formatCount(twapTick)}</span>
       </div>
 
       <div className="mt-10 border-y border-rule py-3">
@@ -88,24 +87,24 @@ export default function CuratorDetail({ id }: { id: number }) {
         </p>
         <div className="mt-5 flex flex-wrap gap-x-12 gap-y-4 text-sm">
           <div>
-            <p className="eyebrow">Hold basket · token0</p>
-            <p className="mt-1 text-lg">{formatToken(vaultDetails.data?.totalHold0 ?? null)}</p>
+            <p className="text-slate">Hold basket · token A</p>
+            <p className="numeric mt-1 text-lg">{formatToken(vaultDetails.data?.totalHold0 ?? null)}</p>
           </div>
           <div>
-            <p className="eyebrow">Hold basket · token1</p>
-            <p className="mt-1 text-lg">{formatToken(vaultDetails.data?.totalHold1 ?? null)}</p>
+            <p className="text-slate">Hold basket · token B</p>
+            <p className="numeric mt-1 text-lg">{formatToken(vaultDetails.data?.totalHold1 ?? null)}</p>
           </div>
           <div>
-            <p className="eyebrow">NAV per share (raw)</p>
-            <p className="mt-1 text-lg">{formatCount(vaultDetails.data?.baseNavPerShare ?? null)}</p>
+            <p className="text-slate">Net asset value per share (raw)</p>
+            <p className="numeric mt-1 text-lg">{formatCount(vaultDetails.data?.baseNavPerShare ?? null)}</p>
           </div>
           <div>
-            <p className="eyebrow">Hold value per share (raw)</p>
-            <p className="mt-1 text-lg">{formatCount(vaultDetails.data?.baseHoldValuePerShare ?? null)}</p>
+            <p className="text-slate">Hold value per share (raw)</p>
+            <p className="numeric mt-1 text-lg">{formatCount(vaultDetails.data?.baseHoldValuePerShare ?? null)}</p>
           </div>
         </div>
         <Link className="mt-5 inline-block text-sm text-slate underline" href="/docs/mandate/">
-          Read the fee and ranking mandate
+          Fee and ranking mandate
         </Link>
       </section>
 
@@ -117,8 +116,9 @@ export default function CuratorDetail({ id }: { id: number }) {
         {history.length === 0 ? (
           <EmptyPanel message="No rebalance logs were found for this vault." />
         ) : (
-          <div className="table-scroll mt-5">
-            <table className="data-table">
+          <div className="table-wrap mt-5">
+            <table>
+              <caption>Block is the chain height. Range set is the lower and upper tick written on-chain.</caption>
               <thead>
                 <tr>
                   <th scope="col">Block</th>
@@ -131,12 +131,12 @@ export default function CuratorDetail({ id }: { id: number }) {
               <tbody>
                 {[...history].reverse().map((entry) => (
                   <tr key={entry.txHash}>
-                    <td>{formatCount(entry.blockNumber)}</td>
-                    <td className="whitespace-nowrap">
+                    <td className="numeric">{formatCount(entry.blockNumber)}</td>
+                    <td className="numeric whitespace-nowrap">
                       {formatSigned(entry.tickLower, "ticks")} to {formatSigned(entry.tickUpper, "ticks")}
                     </td>
-                    <td>{formatCount(entry.tickUpper - entry.tickLower)} ticks</td>
-                    <td>{formatCount(entry.liquidity)}</td>
+                    <td className="numeric">{formatCount(entry.tickUpper - entry.tickLower)} ticks</td>
+                    <td className="numeric">{formatCount(entry.liquidity)}</td>
                     <td>
                       <a className="text-ink underline" href={explorerTx(entry.txHash)} target="_blank" rel="noreferrer">
                         {shortAddress(entry.txHash)}

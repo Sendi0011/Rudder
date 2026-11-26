@@ -4,10 +4,10 @@ import Link from "next/link";
 import { useState } from "react";
 import { useAccount, usePublicClient, useReadContract, useSwitchChain, useWriteContract } from "wagmi";
 import { RudderVaultAbi } from "@/abis";
-import { CHAIN_ID, explorerTx, shortAddress, unichainSepolia } from "@/lib/chain";
+import { explorerTx, shortAddress, unichainSepolia } from "@/lib/chain";
+import { ChainStatus, EmptyPanel, ErrorPanel } from "@/components/StatePanels";
 import { useChainData } from "@/lib/chainData";
 import { formatCount } from "@/lib/format";
-import { ChainStatus, EmptyPanel, ErrorPanel, LoadingPanel } from "@/components/StatePanels";
 import type { Curator, Envelope } from "@/lib/types";
 
 type Notice = { kind: "ok" | "error"; text: string; hash?: string };
@@ -23,10 +23,10 @@ function preflight(lower: number, upper: number, twap: number, envelope: Envelop
   const center = (lower + upper) / 2;
   if (width > envelope.maxRangeWidth) reasons.push(`Range width exceeds ${envelope.maxRangeWidth} ticks.`);
   if (Math.abs(center - twap) > envelope.maxCenterShift) {
-    reasons.push(`Range center is more than ${envelope.maxCenterShift} ticks from the TWAP.`);
+    reasons.push(`Range center is more than ${envelope.maxCenterShift} ticks from the average price.`);
   }
   if (Math.abs(lower - twap) > envelope.maxTwapDistanceTicks || Math.abs(upper - twap) > envelope.maxTwapDistanceTicks) {
-    reasons.push(`A bound is more than ${envelope.maxTwapDistanceTicks} ticks from the TWAP.`);
+    reasons.push(`A bound is more than ${envelope.maxTwapDistanceTicks} ticks from the average price.`);
   }
   if (now - last < envelope.minRebalanceInterval) {
     reasons.push(`Wait ${envelope.minRebalanceInterval - (now - last)} more seconds before rebalancing.`);
@@ -103,7 +103,7 @@ function ConsoleRow({
   async function poke() {
     setNotice(null);
     if (!publicClient || !isCurator || wrongChain) return;
-    setBusy("Poke alpha");
+    setBusy("Update ranking");
     try {
       const hash = await writeContractAsync({
         address: vault,
@@ -111,9 +111,9 @@ function ConsoleRow({
         functionName: "pokeAlpha",
       });
       await publicClient.waitForTransactionReceipt({ hash });
-      setNotice({ kind: "ok", text: "Poke alpha confirmed.", hash });
+      setNotice({ kind: "ok", text: "Ranking update confirmed.", hash });
     } catch (error) {
-      setNotice({ kind: "error", text: error instanceof Error ? error.message : "Poke alpha failed." });
+      setNotice({ kind: "error", text: error instanceof Error ? error.message : "Ranking update failed." });
     } finally {
       setBusy(null);
     }
@@ -131,19 +131,19 @@ function ConsoleRow({
             {liquidity.data !== undefined ? formatCount(liquidity.data) : "--"}
           </p>
         </div>
-        <Link className="text-sm text-ink underline" href={`/curators/${curator.id}/`}>
+        <Link className="text-sm text-ink underline" href={`/vaults/${curator.id}/`}>
           Open detail
         </Link>
       </div>
       <p className="mt-4 text-sm">
         {!owner ? "Connect a wallet to check curator permission." : isCurator ? "Permission: curator" : "Permission: read only"}
-        {!oracleReady ? " · Oracle is not ready for rebalances." : ""}
+        {!oracleReady ? " · Price feed is not ready for rebalances." : ""}
       </p>
       <div className="mt-6 flex flex-wrap gap-6">
         <label className="text-sm">
           Lower tick
           <input
-            className="mt-2 w-36 border border-rule bg-paper px-3 py-2"
+            className="field mt-2 w-36"
             type="number"
             value={lower}
             onChange={(event) => setLower(event.target.value)}
@@ -153,7 +153,7 @@ function ConsoleRow({
         <label className="text-sm">
           Upper tick
           <input
-            className="mt-2 w-36 border border-rule bg-paper px-3 py-2"
+            className="field mt-2 w-36"
             type="number"
             value={upper}
             onChange={(event) => setUpper(event.target.value)}
@@ -163,7 +163,7 @@ function ConsoleRow({
         <div className="flex items-end gap-2">
           <button
             type="button"
-            className="action"
+            className="button"
             disabled={!canRebalance || Boolean(busy)}
             onClick={() => void rebalance()}
           >
@@ -171,11 +171,11 @@ function ConsoleRow({
           </button>
           <button
             type="button"
-            className="action action-quiet"
+            className="button-secondary"
             disabled={!isCurator || wrongChain || Boolean(busy)}
             onClick={() => void poke()}
           >
-            {busy === "Poke alpha" ? "Poke alpha…" : "Poke alpha"}
+            {busy === "Update ranking" ? "Updating ranking…" : "Update ranking"}
           </button>
         </div>
       </div>
@@ -191,7 +191,7 @@ function ConsoleRow({
         </p>
       )}
       {notice ? (
-        <p className={`mt-4 text-sm ${notice.kind === "ok" ? "text-ink" : "text-signal"}`} role="status">
+        <p className="mt-4 text-sm text-ink" role="status">
           {notice.text}{" "}
           {notice.hash ? (
             <Link className="underline" href={explorerTx(notice.hash)} target="_blank" rel="noreferrer">
@@ -205,7 +205,7 @@ function ConsoleRow({
 }
 
 export default function ConsolePanel() {
-  const { data, isLoading, isError, refetch } = useChainData();
+  const { data, isError, refetch } = useChainData();
   const { address, isConnected, chainId } = useAccount();
   const { switchChainAsync } = useSwitchChain();
   const wrongChain = isConnected && chainId !== unichainSepolia.id;
@@ -216,20 +216,19 @@ export default function ConsolePanel() {
     <section>
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="eyebrow">Curator-only writes · chain {CHAIN_ID}</p>
-          <h2 className="mt-2 text-2xl">Curator console</h2>
+          <p className="text-sm text-slate">Curator-only writes</p>
+          <h2 className="mt-2 text-2xl">Strategy controls</h2>
         </div>
         <ChainStatus {...data} />
       </div>
-      {isLoading ? <LoadingPanel label="Reading curator permissions" /> : null}
-      {isError ? <ErrorPanel message="The console could not read the chain." onRetry={() => void refetch()} /> : null}
+      {isError ? <ErrorPanel message="The controls could not read the chain." onRetry={() => void refetch()} /> : null}
       {!isConnected ? <EmptyPanel message="Connect the curator wallet to enable writes." /> : null}
       {wrongChain ? (
         <div className="mt-6 border-y border-rule py-4 text-sm">
           <p>Switch to Unichain Sepolia to continue.</p>
           <button
             type="button"
-            className="action action-quiet mt-3"
+            className="button-secondary mt-3"
             onClick={() => void switchChainAsync({ chainId: unichainSepolia.id }).catch(() => undefined)}
           >
             Switch network

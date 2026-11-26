@@ -15,7 +15,7 @@ import {
 import { formatCount, formatSigned } from "@/lib/format";
 
 export const metadata = {
-  title: "Evidence",
+  title: "What we measured",
   description: "Measurements, negative results and limits of the Rudder evidence set.",
 };
 
@@ -23,23 +23,23 @@ const placebo = evidence_placebo_curators;
 
 const checks = [
   {
-    name: "Deposit guard",
+    name: "Deposit check",
     result: `${evidence_deposit_guard.deviationBps} bps deviation reverted against a ${evidence_deposit_guard.capBps} bps cap`,
     detail: `Revert selector ${evidence_deposit_guard.revertSelector}; ${formatCount(evidence_deposit_guard.observations)} observations.`,
   },
   {
     name: "Rebalance bounds",
     result: `Range ${evidence_rebalance_bounds.lower} to ${evidence_rebalance_bounds.upper} (width ${formatCount(evidence_rebalance_bounds.width)}) accepted inside a ${formatCount(evidence_rebalance_bounds.maxRangeWidth)} tick width limit`,
-    detail: `Center shift ${formatCount(evidence_rebalance_bounds.centerShift)}, NAV change ${formatSigned(evidence_rebalance_bounds.navChangeBps, "bps")}.`,
+    detail: `Centre shift ${formatCount(evidence_rebalance_bounds.centerShift)}, net asset value change ${formatSigned(evidence_rebalance_bounds.navChangeBps, "bps")}.`,
   },
   {
-    name: "TWAP accuracy",
+    name: "Time-weighted price accuracy",
     result: `${formatCount(evidence_twap_accuracy.observations)} observations, tick error ${formatCount(evidence_twap_accuracy.tickError)}`,
-    detail: `Spot ${formatCount(evidence_twap_accuracy.spotTick)}, TWAP ${formatCount(evidence_twap_accuracy.twapTick)}, sqrt deviation ${formatCount(evidence_twap_accuracy.sqrtDeviationBps)} bps.`,
+    detail: `Spot ${formatCount(evidence_twap_accuracy.spotTick)}, average ${formatCount(evidence_twap_accuracy.twapTick)}, square-root deviation ${formatCount(evidence_twap_accuracy.sqrtDeviationBps)} bps.`,
   },
   {
     name: "Flow invariance",
-    result: `Alpha delta ${formatCount(evidence_flow_invariance.depositAlphaDelta)} on deposit and ${formatCount(evidence_flow_invariance.withdrawAlphaDelta)} on withdraw`,
+    result: `Return delta ${formatCount(evidence_flow_invariance.depositAlphaDelta)} on deposit and ${formatCount(evidence_flow_invariance.withdrawAlphaDelta)} on withdraw`,
     detail: `Relative difference ${formatCount(evidence_flow_invariance.relativeDifferenceBps)} bps.`,
   },
   {
@@ -54,8 +54,8 @@ const checks = [
   },
   {
     name: "Rebalance cost",
-    result: `${formatSigned(evidence_rebalance_alpha_cost.alphaCostBps, "bps")} alpha cost on rebalance`,
-    detail: `NAV loss ${formatSigned(evidence_rebalance_alpha_cost.navLossBps, "bps")}; hold basket unchanged: ${String(evidence_rebalance_alpha_cost.holdBasketUnchanged)}.`,
+    result: `${formatSigned(evidence_rebalance_alpha_cost.alphaCostBps, "bps")} return cost on rebalance`,
+    detail: `Net asset value loss ${formatSigned(evidence_rebalance_alpha_cost.navLossBps, "bps")}; hold basket unchanged: ${String(evidence_rebalance_alpha_cost.holdBasketUnchanged)}.`,
   },
   {
     name: "Churner resistance",
@@ -67,29 +67,26 @@ const checks = [
 export default function EvidencePage() {
   return (
     <div className="pt-12 sm:pt-20">
-      <p className="eyebrow">Evidence · measured, not claimed</p>
-      <h1 className="page-lead mt-5">What we measured — and what we did not.</h1>
-      <p className="mt-6 max-w-2xl text-slate">
-        Rudder is a guardrail for curated liquidity, not a performance claim. The placebo test below
-        is a negative result: reactive curators did not beat random curators in this sample.
+      <h1 className="page-title">What we measured.</h1>
+      <p className="page-intro mt-4">
+        These numbers come from the repository fixtures, not a live vault. They show the checks we ran
+        and where the measurements stop.
       </p>
 
       <section className="mt-12 border-y border-rule py-8" aria-labelledby="placebo-heading">
-        <h2 id="placebo-heading" className="text-xl">
-          Curator placebo test
-        </h2>
+        <h2 id="placebo-heading" className="text-2xl">Curator placebo test</h2>
         <div className="mt-6 grid gap-8 sm:grid-cols-3">
           <div>
-            <p className="eyebrow">Reactive mean</p>
-            <p className="figure mt-2">{formatSigned(placebo.reactiveMeanBpsHundredths / 100, "bps", 2)}</p>
+            <p className="text-sm text-slate">Reactive mean</p>
+            <p className="numeric mt-2 text-3xl">{formatSigned(placebo.reactiveMeanBpsHundredths / 100, "bps", 2)}</p>
           </div>
           <div>
-            <p className="eyebrow">Placebo mean</p>
-            <p className="figure mt-2">{formatSigned(placebo.placeboMeanBpsHundredths / 100, "bps", 2)}</p>
+            <p className="text-sm text-slate">Placebo mean</p>
+            <p className="numeric mt-2 text-3xl">{formatSigned(placebo.placeboMeanBpsHundredths / 100, "bps", 2)}</p>
           </div>
           <div>
-            <p className="eyebrow">Static mean</p>
-            <p className="figure mt-2">{formatSigned(placebo.staticMeanBpsHundredths / 100, "bps", 2)}</p>
+            <p className="text-sm text-slate">Static mean</p>
+            <p className="numeric mt-2 text-3xl">{formatSigned(placebo.staticMeanBpsHundredths / 100, "bps", 2)}</p>
           </div>
         </div>
         <dl className="mt-8 grid gap-3 text-sm sm:grid-cols-2">
@@ -99,36 +96,36 @@ export default function EvidencePage() {
           </div>
           <div>
             <dt className="text-slate">z-score</dt>
-            <dd>{formatSigned(placebo.reactiveVsPlaceboZScoreTimes100 / placebo.zScoreScale, "", 2)}</dd>
+            <dd className="numeric">{formatSigned(placebo.reactiveVsPlaceboZScoreTimes100 / placebo.zScoreScale, "", 2)}</dd>
           </div>
           <div>
             <dt className="text-slate">Placebo samples</dt>
-            <dd>{formatCount(placebo.placeboSamples)}</dd>
+            <dd className="numeric">{formatCount(placebo.placeboSamples)}</dd>
           </div>
           <div>
-            <dt className="text-slate">Envelopes / regimes / k</dt>
-            <dd>
+            <dt className="text-slate">Limits / regimes / sample size</dt>
+            <dd className="numeric">
               {formatCount(placebo.envelopes)} / {formatCount(placebo.regimes)} / {formatCount(placebo.k)}
             </dd>
           </div>
           <div>
             <dt className="text-slate">Worst rebalance loss</dt>
-            <dd>{formatSigned(placebo.worstRebalanceLossBpsHundredths / 100, "bps", 2)}</dd>
+            <dd className="numeric">{formatSigned(placebo.worstRebalanceLossBpsHundredths / 100, "bps", 2)}</dd>
           </div>
           <div>
-            <dt className="text-slate">Max drawdown versus hold</dt>
-            <dd>{formatSigned(placebo.maxDrawdownVsHoldBpsHundredths / 100, "bps", 2)}</dd>
+            <dt className="text-slate">Max drawdown versus holding</dt>
+            <dd className="numeric">{formatSigned(placebo.maxDrawdownVsHoldBpsHundredths / 100, "bps", 2)}</dd>
           </div>
         </dl>
       </section>
 
       <section className="mt-12" aria-labelledby="checks-heading">
-        <h2 id="checks-heading" className="text-xl">
-          Guardrails and invariants
-        </h2>
-        <div className="table-scroll mt-6">
-          <table className="data-table">
-            <caption className="sr-only">Evidence checks and observed results</caption>
+        <h2 id="checks-heading" className="text-2xl">Checks and invariants</h2>
+        <div className="table-wrap mt-6">
+          <table>
+            <caption>
+              bps means basis points. A selector is the four-byte identifier of a contract revert.
+            </caption>
             <thead>
               <tr>
                 <th scope="col">Check</th>
@@ -139,8 +136,8 @@ export default function EvidencePage() {
             <tbody>
               {checks.map((check) => (
                 <tr key={check.name}>
-                  <th scope="row">{check.name}</th>
-                  <td>{check.result}</td>
+                  <th scope="row" className="font-normal">{check.name}</th>
+                  <td className="numeric">{check.result}</td>
                   <td className="text-slate">{check.detail}</td>
                 </tr>
               ))}
@@ -150,12 +147,12 @@ export default function EvidencePage() {
       </section>
 
       <section className="mt-12 border-y border-rule py-8" aria-labelledby="loss-heading">
-        <h2 id="loss-heading" className="text-xl">
-          Daily loss budget
-        </h2>
-        <div className="table-scroll mt-6">
-          <table className="data-table">
-            <caption className="sr-only">Daily NAV loss budget by configuration</caption>
+        <h2 id="loss-heading" className="text-2xl">Daily loss budget</h2>
+        <div className="table-wrap mt-6">
+          <table>
+            <caption>
+              Bound is the published limit. Observed is the measured loss in basis points.
+            </caption>
             <thead>
               <tr>
                 <th scope="col">Configuration</th>
@@ -167,10 +164,10 @@ export default function EvidencePage() {
             <tbody>
               {Object.entries(evidence_worst_case_loss).map(([name, values]) => (
                 <tr key={name}>
-                  <th scope="row">{name}</th>
-                  <td>{formatCount(values.BoundBps)} bps</td>
-                  <td>{formatCount(values.ObservedBps)} bps</td>
-                  <td>{formatCount(values.Rebalances)}</td>
+                  <th scope="row" className="font-normal">{name}</th>
+                  <td className="numeric">{formatCount(values.BoundBps)} bps</td>
+                  <td className="numeric">{formatCount(values.ObservedBps)} bps</td>
+                  <td className="numeric">{formatCount(values.Rebalances)}</td>
                 </tr>
               ))}
             </tbody>
@@ -179,9 +176,7 @@ export default function EvidencePage() {
       </section>
 
       <section className="mt-12" aria-labelledby="prior-heading">
-        <h2 id="prior-heading" className="text-xl">
-          Prior art search
-        </h2>
+        <h2 id="prior-heading" className="text-2xl">Prior art search</h2>
         <p className="mt-3 max-w-2xl text-slate">
           {formatCount(evidence_prior_art_search.total_entries_searched)} hook-directory and hooklist
           entries were searched on {evidence_prior_art_search.run_date}. The curator query returned{" "}
