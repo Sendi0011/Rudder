@@ -35,4 +35,4 @@ A ~3-minute walkthrough for reviewers.
 
 ---
 
-Rendered from commit e2136aea016f055a33d630b075eedb1cc6db4667 · [View source](https://github.com/Sendi0011/Rudder/blob/e2136aea016f055a33d630b075eedb1cc6db4667/docs/DEMO.md)
+Rendered from commit 1d00a33f16fb0d270836a1fd8e8984523363f352 · [View source](https://github.com/Sendi0011/Rudder/blob/1d00a33f16fb0d270836a1fd8e8984523363f352/docs/DEMO.md)

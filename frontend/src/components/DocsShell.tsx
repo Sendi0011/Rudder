@@ -4,11 +4,12 @@ import path from "node:path";
 import ReactMarkdown, { type Components } from "react-markdown";
 import rehypeHighlight from "rehype-highlight";
 import remarkGfm from "remark-gfm";
+import CodeBlock from "@/components/CodeBlock";
+import DocsNav from "@/components/DocsNav";
+import DocsToc, { type DocsTocItem } from "@/components/DocsToc";
 import manifest from "../../content/manifest.json";
 
 type Doc = (typeof manifest)[number];
-
-const groupOrder = ["Start", "Design", "Assurance", "Deployment"];
 
 function slugify(value: string) {
   return value
@@ -27,7 +28,7 @@ function textOf(node: React.ReactNode): string {
   return "";
 }
 
-function tocOf(markdown: string) {
+function tocOf(markdown: string): DocsTocItem[] {
   return markdown
     .split("\n")
     .filter((line) => line.startsWith("## "))
@@ -37,15 +38,35 @@ function tocOf(markdown: string) {
     });
 }
 
+function hrefFor(slug: string) {
+  return slug === "index" ? "/docs/" : `/docs/${slug}/`;
+}
+
 const components: Components = {
   h1({ children }) {
     return <h2>{children}</h2>;
   },
   h2({ children }) {
-    return <h2 id={slugify(textOf(children))}>{children}</h2>;
+    const id = slugify(textOf(children));
+    return (
+      <h2 id={id}>
+        {children}
+        <a className="docs-anchor" href={`#${id}`} aria-label="Link to this section">
+          #
+        </a>
+      </h2>
+    );
   },
   h3({ children }) {
-    return <h3 id={slugify(textOf(children))}>{children}</h3>;
+    const id = slugify(textOf(children));
+    return (
+      <h3 id={id}>
+        {children}
+        <a className="docs-anchor" href={`#${id}`} aria-label="Link to this section">
+          #
+        </a>
+      </h3>
+    );
   },
   a({ href, children }) {
     const target = href ?? "#";
@@ -60,6 +81,16 @@ const components: Components = {
       );
     }
     return <a href={target}>{children}</a>;
+  },
+  table({ children }) {
+    return (
+      <div className="docs-table-wrap">
+        <table>{children}</table>
+      </div>
+    );
+  },
+  pre({ children }) {
+    return <CodeBlock>{children}</CodeBlock>;
   },
 };
 
@@ -76,54 +107,58 @@ export function staticDocParams() {
 export default function DocsShell({ doc }: { doc: Doc }) {
   const markdown = readFileSync(path.join(process.cwd(), "content", `${doc.slug}.md`), "utf8");
   const toc = tocOf(markdown);
+  const navItems = manifest.map(({ slug, title, group }) => ({ slug, title, group }));
+  const currentIndex = manifest.findIndex((entry) => entry.slug === doc.slug);
+  const previous = currentIndex > 0 ? manifest[currentIndex - 1] : undefined;
+  const next = currentIndex >= 0 ? manifest[currentIndex + 1] : undefined;
 
   return (
-    <div className="grid gap-10 border-t border-rule pt-8 lg:grid-cols-[15rem_minmax(0,1fr)_12rem]">
-      <nav aria-label="Documentation" className="text-sm">
-        {groupOrder.map((group) => (
-          <div key={group} className="mb-6">
-            <p className="text-sm font-semibold">{group}</p>
-            <ul className="mt-2 space-y-1">
-              {manifest
-                .filter((entry) => entry.group === group)
-                .map((entry) => (
-                  <li key={entry.slug}>
-                    <Link
-                      href={entry.slug === "index" ? "/docs/" : `/docs/${entry.slug}/`}
-                      className={entry.slug === doc.slug ? "text-ink underline" : "text-slate hover:text-ink"}
-                      aria-current={entry.slug === doc.slug ? "page" : undefined}
-                    >
-                      {entry.title}
-                    </Link>
-                  </li>
-                ))}
-            </ul>
+    <div className="docs-frame">
+      <div className="docs-bar">
+        <div className="docs-crumbs">
+          <Link href="/docs/">Docs</Link>
+          <span aria-hidden="true">/</span>
+          <span>{doc.group}</span>
+        </div>
+        <span className="docs-bar-note">Reference</span>
+      </div>
+      <div className="docs-layout">
+        <DocsNav items={navItems} activeSlug={doc.slug} />
+        <article className="docs-prose min-w-0">
+          <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight]} components={components}>
+            {markdown}
+          </ReactMarkdown>
+          <div className="docs-pager">
+            {previous ? (
+              <Link className="docs-pager-link" href={hrefFor(previous.slug)}>
+                <span className="docs-pager-label">
+                  <span className="docs-pager-arrow" aria-hidden="true">
+                    ←
+                  </span>
+                  Previous
+                </span>
+                <span className="docs-pager-title">{previous.title}</span>
+              </Link>
+            ) : (
+              <span />
+            )}
+            {next ? (
+              <Link className="docs-pager-link docs-pager-next" href={hrefFor(next.slug)}>
+                <span className="docs-pager-label">
+                  Next
+                  <span className="docs-pager-arrow" aria-hidden="true">
+                    →
+                  </span>
+                </span>
+                <span className="docs-pager-title">{next.title}</span>
+              </Link>
+            ) : (
+              <span />
+            )}
           </div>
-        ))}
-      </nav>
-      <article className="docs-prose min-w-0">
-        <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight]} components={components}>
-          {markdown}
-        </ReactMarkdown>
-      </article>
-      <aside aria-labelledby="toc-heading" className="hidden lg:block">
-        <p id="toc-heading" className="text-sm font-semibold">
-          On this page
-        </p>
-        {toc.length ? (
-          <ul className="mt-3 space-y-2 text-sm">
-            {toc.map((entry) => (
-              <li key={entry.id}>
-                <a className="text-slate hover:text-ink" href={`#${entry.id}`}>
-                  {entry.label}
-                </a>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="mt-3 text-sm text-slate">No sections.</p>
-        )}
-      </aside>
+        </article>
+        <DocsToc items={toc} />
+      </div>
     </div>
   );
 }
