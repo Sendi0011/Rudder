@@ -80,6 +80,11 @@ function rewrite(markdown, source) {
     return `${bang}[${label}](${origin}/raw/${commit}/${resolved}${hash})`;
   });
 
+  output = output
+    .replace(/<!--\s*claim:RUD-\d+\s*-->/g, "")
+    .replace(/claim:RUD-\d+/g, "")
+    .replace(/[ \t]+$/gm, "");
+
   return `${output.trimEnd()}\n\n---\n\nRendered from commit ${commit} · [View source](${origin}/blob/${commit}/${source})\n`;
 }
 
